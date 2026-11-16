@@ -39,6 +39,7 @@ namespace AetherDrift.Player
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(PlayerStats))]
+    [RequireComponent(typeof(PlayerVehicle))]
     public class CarController : MonoBehaviour
     {
         // ============================================================
@@ -177,8 +178,10 @@ namespace AetherDrift.Player
             stats = GetComponent<PlayerStats>();
             vehicle = GetComponent<PlayerVehicle>();
 
-            // Les deux axes de rotation X/Z restent figés : jamais de tonneau
-            // involontaire. Le lacet (Y) est piloté pour la direction.
+            // Le contrôleur est la source de vérité des contraintes : les axes
+            // X/Z sont figés (jamais de tonneau), le lacet (Y) reste piloté.
+            // PlayerVehicle applique sa propre valeur dans son Awake ; on la
+            // réaffirme ici pour ne dépendre d'aucun ordre d'exécution.
             rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -194,7 +197,19 @@ namespace AetherDrift.Player
             if (mainCamera != null)
                 cameraFollow = mainCamera.GetComponent<CameraFollow>();
 
-            CreateTrails();
+            // Les effets visuels ne doivent JAMAIS pouvoir empêcher de conduire :
+            // une exception dans la création des trails (shader absent, etc.)
+            // laisserait la voiture immobile et le joueur sans explication.
+            try
+            {
+                CreateTrails();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[AETHER DRIFT] Trails indisponibles (conduite non affectée) : " + e.Message);
+                trails = null;
+            }
+
             initialized = true;
 
             Debug.Log("[AETHER DRIFT] CarController prêt — ZQSD/WASD + Espace (drift) + Shift/Clic droit (esquive).");
@@ -766,6 +781,19 @@ namespace AetherDrift.Player
         {
             if (!showDebugGauges || stats == null)
                 return;
+
+            // --- Témoin d'entrées : confirme que le clavier est bien lu ---
+            GUIStyle inputStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 12,
+                normal = { textColor = new Color(0.75f, 0.85f, 1f) }
+            };
+            GUI.Label(new Rect(24f, Screen.height - 172f, 420f, 22f),
+                "THROTTLE " + throttleInput.ToString("+0;-0;0")
+                + "   STEER " + steerInput.ToString("+0;-0;0")
+                + "   DRIFT " + (driftHeld ? "ON" : "off")
+                + "   STATE " + (initialized ? "OK" : "NON INIT")
+                + "   GROUND " + (isGrounded ? "yes" : "no"), inputStyle);
 
             DrawGauge(new Rect(24f, Screen.height - 96f, 260f, 22f),
                 "ÉTHER", stats.EtherRatio, new Color(0.15f, 0.9f, 1f));

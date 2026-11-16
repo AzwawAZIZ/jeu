@@ -86,7 +86,9 @@ namespace AetherDrift.Player
             // Le Rigidbody ne tourne pas : c'est le châssis VISUEL qui s'oriente
             // vers la trajectoire. La physique reste donc parfaitement stable
             // (aucun renversement possible) tout en gardant un rendu dynamique.
-            rb.constraints = RigidbodyConstraints.FreezeRotation;
+            // CarController réaffirme ces contraintes : la conduite ne dépend
+            // donc d'aucun ordre d'exécution entre les deux scripts.
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             rb.isKinematic = false;
 
             BuildPhysicsSphere();
