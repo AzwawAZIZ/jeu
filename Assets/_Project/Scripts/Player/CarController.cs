@@ -599,6 +599,11 @@ namespace AetherDrift.Player
             if (chassis == null)
                 return;
 
+            // Le modèle importé n'a pas de lames latérales : on garde malgré tout
+            // les trails (ils partent des flancs et des roues arrière), c'est ce
+            // qui rend le drift lisible.
+
+
             Shader trailShader = Shader.Find("Sprites/Default");
             if (trailShader == null)
                 trailShader = Shader.Find("Unlit/Transparent");
@@ -763,6 +768,9 @@ namespace AetherDrift.Player
 
         /// <summary>Vrai pendant le boost visuel.</summary>
         public bool IsBoosting => boostTimer > 0f;
+
+        /// <summary>Braquage courant, de -1 (gauche) à +1 (droite). Lu par WheelSpinner.</summary>
+        public float SteerInput => steerInput;
 
         /// <summary>
         /// Applique une poussée externe (explosion de boss, tremplin runique…).

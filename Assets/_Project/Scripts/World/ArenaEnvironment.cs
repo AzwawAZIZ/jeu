@@ -26,8 +26,9 @@ namespace AetherDrift.World
         // PALETTE — un seul endroit pour tout retoucher
         // ============================================================
 
-        private static readonly Color GroundDeep = new Color(0.09f, 0.10f, 0.13f);
-        private static readonly Color GroundNear = new Color(0.13f, 0.14f, 0.18f);
+        private static readonly Color GroundDeep = new Color(0.20f, 0.21f, 0.25f);
+        private static readonly Color GroundNear = new Color(0.27f, 0.28f, 0.32f);
+        private static readonly Color GroundEdge = new Color(0.14f, 0.15f, 0.19f);
         private static readonly Color StoneLight = new Color(0.44f, 0.45f, 0.48f);
         private static readonly Color StoneDark = new Color(0.28f, 0.29f, 0.33f);
         private static readonly Color Moss = new Color(0.26f, 0.36f, 0.28f);
@@ -53,7 +54,27 @@ namespace AetherDrift.World
             AttachMesh(ground, mesh, "GroundDisc");
 
             MeshRenderer renderer = ground.GetComponent<MeshRenderer>();
-            Material mat = ProceduralMaterials.Create("GroundDeep", GroundDeep, Color.black, 0f, 0.08f, 0f);
+            Material mat = ProceduralMaterials.Create("GroundDeep", Color.white, Color.black, 0f, 0.10f, 0f);
+
+            // Texture procédurale : gravier/terre battue. Sans elle, le sol reste
+            // un aplat uniforme qui "flotte" visuellement.
+            Texture2D groundTexture = CreateGroundTexture(512);
+            if (groundTexture != null)
+            {
+                groundTexture.wrapMode = TextureWrapMode.Repeat;
+
+                if (mat.HasProperty("_BaseMap"))
+                {
+                    mat.SetTexture("_BaseMap", groundTexture);
+                    mat.SetTextureScale("_BaseMap", new Vector2(diameter / 8f, diameter / 8f));
+                }
+                if (mat.HasProperty("_MainTex"))
+                {
+                    mat.SetTexture("_MainTex", groundTexture);
+                    mat.SetTextureScale("_MainTex", new Vector2(diameter / 8f, diameter / 8f));
+                }
+            }
+
             renderer.sharedMaterial = mat;
             renderer.receiveShadows = true;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -63,6 +84,69 @@ namespace AetherDrift.World
             collider.sharedMesh = ground.GetComponent<MeshFilter>().sharedMesh;
 
             return ground;
+        }
+
+        /// <summary>
+        /// Texture procédurale du sol : bruit de gravier + taches sombres.
+        /// Générée une seule fois (512x512), tileable grossièrement.
+        /// </summary>
+        private static Texture2D CreateGroundTexture(int size)
+        {
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            texture.name = "GroundGravel";
+
+            Color[] pixels = new Color[size * size];
+            System.Random rng = new System.Random(4242);
+
+            // Bruit de valeur grossier, puis lissage : donne des taches naturelles
+            // plutôt qu'un grain régulier qui scintille au loin.
+            int cells = 24;
+            float[] noise = new float[cells * cells];
+            for (int i = 0; i < noise.Length; i++)
+                noise[i] = (float)rng.NextDouble();
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float fx = (float)x / size * cells;
+                    float fy = (float)y / size * cells;
+
+                    int ix = Mathf.FloorToInt(fx);
+                    int iy = Mathf.FloorToInt(fy);
+                    float tx = fx - ix;
+                    float ty = fy - iy;
+
+                    float n00 = noise[(iy % cells) * cells + (ix % cells)];
+                    float n10 = noise[(iy % cells) * cells + ((ix + 1) % cells)];
+                    float n01 = noise[((iy + 1) % cells) * cells + (ix % cells)];
+                    float n11 = noise[((iy + 1) % cells) * cells + ((ix + 1) % cells)];
+
+                    // Interpolation lissée (smoothstep) pour éviter les arêtes.
+                    float sx = tx * tx * (3f - 2f * tx);
+                    float sy = ty * ty * (3f - 2f * ty);
+
+                    float top = Mathf.Lerp(n00, n10, sx);
+                    float bottom = Mathf.Lerp(n01, n11, sx);
+                    float value = Mathf.Lerp(top, bottom, sy);
+
+                    // Grain fin par-dessus.
+                    value += ((float)rng.NextDouble() - 0.5f) * 0.16f;
+                    value = Mathf.Clamp01(value);
+
+                    Color color = Color.Lerp(GroundDeep, GroundNear, value);
+
+                    // Taches plus sombres (humidité, usure).
+                    if (value < 0.28f)
+                        color = Color.Lerp(color, GroundEdge, 0.55f);
+
+                    pixels[y * size + x] = color;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(true);
+            return texture;
         }
 
         /// <summary>Disque plat subdivisé (centre + anneaux) → donne des facettes d'éclairage.</summary>

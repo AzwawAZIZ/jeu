@@ -35,6 +35,14 @@ namespace AetherDrift.Player
         [Tooltip("Rayon de la sphère physique invisible.")]
         [SerializeField] private float physicsRadius = 1.1f;
 
+        [Header("Modèle 3D importé (CC0)")]
+        [Tooltip("Utiliser le modèle OBJ importé plutôt que le châssis procédural. " +
+                 "Si les fichiers sont absents, le châssis procédural est utilisé automatiquement.")]
+        [SerializeField] private bool useImportedModel = true;
+
+        [Tooltip("Échelle du modèle importé (1 = mètres du fichier).")]
+        [SerializeField] private float importedModelScale = 1f;
+
         [Header("Livrée / couleurs")]
         [Tooltip("Couleur de la carrosserie.")]
         [SerializeField] private Color bodyColor = new Color(0.13f, 0.15f, 0.19f);
@@ -92,7 +100,13 @@ namespace AetherDrift.Player
             rb.isKinematic = false;
 
             BuildPhysicsSphere();
-            BuildVisualChassis();
+
+            // Priorité au modèle 3D importé ; repli sur le châssis procédural.
+            if (useImportedModel)
+                BuildImportedChassis();
+
+            if (VisualChassis == null)
+                BuildVisualChassis();
         }
 
         // ============================================================
@@ -121,6 +135,44 @@ namespace AetherDrift.Player
                 collider.radius = 0.5f; // la primitive fait 1 m avant mise à l'échelle
                 collider.center = Vector3.zero;
             }
+        }
+
+        // ============================================================
+        // CHÂSSIS IMPORTÉ (modèle CC0)
+        // ============================================================
+
+        /// <summary>
+        /// Charge le bolide depuis Resources/Vehicles/. Si un fichier manque,
+        /// VisualChassis reste null et l'appelant bascule sur le procédural.
+        /// </summary>
+        private void BuildImportedChassis()
+        {
+            VisualChassis = null;
+
+            // Racine visuelle détachée de la physique (comme le châssis procédural).
+            GameObject root = new GameObject("VisualChassis (importé)");
+            root.transform.position = transform.position + Vector3.up * 0.15f;
+            root.transform.rotation = Quaternion.identity;
+
+            VehicleModelLoader.LoadedModel model =
+                VehicleModelLoader.Load(root.transform, importedModelScale, Color.white);
+
+            if (model == null)
+            {
+                // Échec : on supprime la racine vide pour ne pas laisser de résidu.
+                Destroy(root);
+                Debug.Log("[AETHER DRIFT] Modèle importé indisponible : châssis procédural utilisé.");
+                return;
+            }
+
+            VisualChassis = root.transform;
+
+            // Matériaux animables : le modèle n'a qu'un matériau, on l'utilise
+            // pour les lames et les réacteurs (les teintes sont pilotées par
+            // CarController via l'émission).
+            BladeMaterial = model.BodyMaterial;
+            ThrusterMaterial = model.BodyMaterial;
+            CanopyMaterial = model.BodyMaterial;
         }
 
         // ============================================================

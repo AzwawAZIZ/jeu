@@ -23,6 +23,7 @@ Cette étape initialise le projet et génère **tout le contenu de la scène par
 | **Bootstrapper** | `Assets/_Project/Scripts/Core/GameBootstrapper.cs` | Au `Awake()`, génère le sol, le véhicule, la caméra et la lumière via `GameObject.CreatePrimitive`. |
 | **Caméra fluide** | `Assets/_Project/Scripts/Player/CameraFollow.cs` | Suit le véhicule en `LateUpdate()`, zoom arrière + FOV dynamique selon la vitesse. |
 | **Véhicule (base)** | `Assets/_Project/Scripts/Player/PlayerVehicle.cs` | Sphère physique invisible (`Rigidbody` + `SphereCollider`) + châssis low-poly détaché (il suit la sphère et s'oriente vers la trajectoire). |
+| **Modèle 3D** | `Assets/_Project/Resources/Vehicles/` | Bolide low-poly CC0 (Popyca Studio), 4 roues séparées qui tournent et braquent. Repli automatique sur le châssis procédural si absent. |
 | **Conduite** | `Assets/_Project/Scripts/Player/CarController.cs` | Physique *sphere car* (`AddForce`), direction en lacet piloté, adhérence/drift, boost d'éther, dash d'invincibilité, trails procéduraux. |
 | **Ressources** | `Assets/_Project/Scripts/Player/PlayerStats.cs` | Jauges d'éther et d'endurance, régénération, i-frames, événements pour le HUD. |
 | **Sol / arène** | généré par le Bootstrapper | Grand plan sombre + ruines décoratives (piliers) pour donner l'échelle de la vallée. |
@@ -101,6 +102,18 @@ Assets/
 
 ---
 
-## 📄 Licence
+## 📄 Licences
 
-Projet personnel / pédagogique. Tous droits réservés.
+**Code du jeu :** projet personnel / pédagogique, tous droits réservés.
+
+**Ressources tierces :**
+
+| Ressource | Auteur | Licence | Attribution requise |
+|---|---|---|---|
+| Modèle de véhicule `muscle_blue` | Popyca Studio — [5 Free Low-Poly Toy Cars](https://github.com/Vuena/free-low-poly-toy-cars-cc0) | **CC0 1.0** (domaine public) | Non |
+
+Le modèle est en domaine public : usage commercial, modification et
+redistribution autorisés sans autorisation ni attribution. La dédicace
+originale est conservée dans `Assets/_Project/Resources/Vehicles/LICENSE-CC0.txt`
+par respect pour l'auteur, et pour que la provenance reste traçable.
+Détails de la conversion FBX → OBJ : voir `Resources/Vehicles/README.md`.
