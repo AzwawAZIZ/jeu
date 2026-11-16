@@ -149,6 +149,80 @@ namespace AetherDrift.World
             return texture;
         }
 
+        /// <summary>
+        /// Sol VASTE (carré) pour le monde ouvert de l'Étape 3.
+        ///
+        /// Différences avec <see cref="CreateGround"/> :
+        ///  - carré au lieu de circulaire : couvre toute la carte sans trou,
+        ///  - subdivisé en grille pour que l'éclairage varie (pas un aplat),
+        ///  - texture de gravier répétée à grande échelle.
+        ///
+        /// Le collider est un MeshCollider : la voiture roule sur le relief exact.
+        /// </summary>
+        public static GameObject CreateVastGround(float size, int divisions, Transform parent)
+        {
+            GameObject ground = new GameObject("Ground (monde ouvert)");
+            ground.transform.SetParent(parent, false);
+
+            divisions = Mathf.Clamp(divisions, 1, 120);
+            LowPolyMesh mesh = new LowPolyMesh();
+
+            float step = size / divisions;
+            float half = size * 0.5f;
+
+            for (int z = 0; z < divisions; z++)
+            {
+                for (int x = 0; x < divisions; x++)
+                {
+                    float x0 = -half + x * step;
+                    float x1 = x0 + step;
+                    float z0 = -half + z * step;
+                    float z1 = z0 + step;
+
+                    Vector3 p00 = new Vector3(x0, 0f, z0);
+                    Vector3 p10 = new Vector3(x1, 0f, z0);
+                    Vector3 p11 = new Vector3(x1, 0f, z1);
+                    Vector3 p01 = new Vector3(x0, 0f, z1);
+
+                    mesh.AddQuadFacing(p00, p10, p11, p01, Vector3.up);
+                }
+            }
+
+            Mesh built = mesh.Build("VastGround");
+            ground.AddComponent<MeshFilter>().sharedMesh = built;
+
+            MeshRenderer renderer = ground.AddComponent<MeshRenderer>();
+            Material material = ProceduralMaterials.Create("VastGround", Color.white, Color.black, 0f, 0.08f, 0f);
+
+            Texture2D texture = CreateGroundTexture(512);
+            if (texture != null)
+            {
+                texture.wrapMode = TextureWrapMode.Repeat;
+                // Une répétition tous les 40 m : le grain reste lisible de loin
+                // sans scintiller au déplacement.
+                float tiling = size / 40f;
+
+                if (material.HasProperty("_BaseMap"))
+                {
+                    material.SetTexture("_BaseMap", texture);
+                    material.SetTextureScale("_BaseMap", new Vector2(tiling, tiling));
+                }
+                if (material.HasProperty("_MainTex"))
+                {
+                    material.SetTexture("_MainTex", texture);
+                    material.SetTextureScale("_MainTex", new Vector2(tiling, tiling));
+                }
+            }
+
+            renderer.sharedMaterial = material;
+            renderer.receiveShadows = true;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            ground.AddComponent<MeshCollider>().sharedMesh = built;
+
+            return ground;
+        }
+
         /// <summary>Disque plat subdivisé (centre + anneaux) → donne des facettes d'éclairage.</summary>
         private static void BuildDisc(LowPolyMesh mesh, Vector3 center, float radius, int segments, int rings)
         {

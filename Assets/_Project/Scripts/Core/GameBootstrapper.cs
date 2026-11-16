@@ -1,14 +1,20 @@
+using System.Collections.Generic;
 using UnityEngine;
 using AetherDrift.Player;
 using AetherDrift.World;
+using AetherDrift.Enemies;
 
 namespace AetherDrift.Core
 {
     /// <summary>
-    /// Point d'entrée procédural du jeu — ÉTAPE 1.
+    /// Point d'entrée procédural du jeu — ÉTAPES 1 à 3.
     ///
     /// Au lancement (Awake) ce script assemble TOUTE la scène par code :
-    /// aucun asset, aucune scène préparée à la main.
+    /// sol, monde ouvert en trois zones, tours de synchronisation, véhicule,
+    /// caméra, contrats et chasseurs. Aucune scène préparée à la main.
+    ///
+    /// En cas de souci, décoche « Open World Enabled » dans l'Inspector :
+    /// le jeu revient à la petite arène de l'Étape 1.
     ///
     ///   Sol facetté + anneau d'arène + cercle runique   (World/ArenaEnvironment)
     ///   Ruines : piliers, tambours, débris              (World/ArenaEnvironment)
@@ -25,6 +31,20 @@ namespace AetherDrift.Core
     [DefaultExecutionOrder(-100)]
     public class GameBootstrapper : MonoBehaviour
     {
+        [Header("Monde ouvert (Étape 3)")]
+        [Tooltip("Activer le monde ouvert généré (zones, tours, contrats). " +
+                 "Désactiver pour revenir à la petite arène de l'Étape 1.")]
+        [SerializeField] private bool openWorldEnabled = true;
+
+        [Tooltip("Demi-taille de la carte, en mètres (600 = 1,2 km de côté).")]
+        [SerializeField] private float worldHalfSize = 600f;
+
+        [Tooltip("Nombre de tours de synchronisation.")]
+        [SerializeField] private int syncTowerCount = 3;
+
+        [Tooltip("Nombre de contrats de livraison.")]
+        [SerializeField] private int contractCount = 3;
+
         [Header("Sol / Arène")]
         [Tooltip("Diamètre du sol praticable, en mètres.")]
         [SerializeField] private float groundDiameter = 220f;
@@ -66,6 +86,13 @@ namespace AetherDrift.Core
         private Transform playerTransform;
         private GameObject worldRoot;
 
+        // Étape 3
+        private WorldGenerator world;
+        private ContractManager contractManager;
+        private readonly List<SyncTower> towers = new List<SyncTower>();
+        private int synchronizedTowerCount;
+        private DescentHelper descentHelper;
+
         // ============================================================
         // DÉMARRAGE
         // ============================================================
@@ -91,18 +118,43 @@ namespace AetherDrift.Core
 
             worldRoot = new GameObject("World (généré)");
 
-            BuildGround();
-            BuildArena();
-            BuildRuins();
-            BuildHorizon();
-            BuildSky();
-            BuildPlayer();
-            BuildCamera();
-            BuildSun();
-            ConfigureAmbiance();
+            if (openWorldEnabled)
+            {
+                // --- Monde ouvert (Étape 3) ---
+                // L'ordre n'est pas décoratif :
+                //   sol → monde (tours et contrats réservent leurs places AVANT
+                //   la génération du décor) → tours → horizon → ciel → joueur
+                //   → caméra → soleil → ambiance → balises de contrats (elles
+                //   ont besoin du joueur pour les tests de distance).
+                BuildVastGround();
+                BuildWorld();
+                BuildSyncTowers();
+                BuildHorizon();
+                BuildSky();
+                BuildPlayer();
+                BuildCamera();
+                BuildSun();
+                ConfigureAmbiance();
+                BuildContracts();
+            }
+            else
+            {
+                // --- Arène de l'Étape 1 (mode réduit) ---
+                BuildGround();
+                BuildArena();
+                BuildRuins();
+                BuildHorizon();
+                BuildSky();
+                BuildPlayer();
+                BuildCamera();
+                BuildSun();
+                ConfigureAmbiance();
+            }
 
             LogDiagnostics();
-            Debug.Log("[AETHER DRIFT] Bootstrapper : scène générée procéduralement (Étape 1).");
+            LogOpenWorldSummary();
+            Debug.Log("[AETHER DRIFT] Bootstrapper : monde généré procéduralement"
+                + (openWorldEnabled ? " (Étape 3 — monde ouvert)." : " (Étape 1 — arène)."));
         }
 
         // ============================================================
@@ -165,12 +217,16 @@ namespace AetherDrift.Core
 
         private void BuildHorizon()
         {
-            ArenaEnvironment.CreateDistantMountains(groundDiameter * 0.45f, worldRoot.transform, mountainCount);
+            // Monde ouvert : les montagnes doivent rester DERRIÈRE la limite de
+            // la carte (sinon elles poussent au milieu du terrain praticable).
+            float radius = openWorldEnabled ? worldHalfSize * 1.25f : groundDiameter * 0.45f;
+            ArenaEnvironment.CreateDistantMountains(radius, worldRoot.transform, mountainCount);
         }
 
         private void BuildSky()
         {
-            ArenaEnvironment.CreateSkyDome(groundDiameter * 3.2f, worldRoot.transform);
+            float radius = openWorldEnabled ? worldHalfSize * 2.6f : groundDiameter * 3.2f;
+            ArenaEnvironment.CreateSkyDome(radius, worldRoot.transform);
         }
 
         // ============================================================
@@ -213,7 +269,9 @@ namespace AetherDrift.Core
             cam.backgroundColor = skyColor;
             cam.fieldOfView = 62f;
             cam.nearClipPlane = 0.2f;
-            cam.farClipPlane = 900f;
+            // Monde ouvert : le brouillard cache la limite de la carte bien
+            // avant la distance d'affichage maximale (évite de voir "le vide").
+            cam.farClipPlane = openWorldEnabled ? 1600f : 900f;
 
             CameraFollow follow = cameraObject.AddComponent<CameraFollow>();
             if (playerTransform != null)
@@ -224,6 +282,188 @@ namespace AetherDrift.Core
             cameraObject.transform.position = startPosition;
             if (playerTransform != null)
                 cameraObject.transform.LookAt(playerTransform.position + new Vector3(0f, 1.2f, 0f));
+        }
+
+        // ============================================================
+        // ÉTAPE 3 — MONDE OUVERT
+        // ============================================================
+
+        /// <summary>Sol immense (1,2 km) avec texture répétée et collider.</summary>
+        private void BuildVastGround()
+        {
+            ArenaEnvironment.CreateVastGround(worldHalfSize * 2f, 24, worldRoot.transform);
+        }
+
+        /// <summary>Génère les trois zones (ruines, rampes, chemins) et les rochers.</summary>
+        private void BuildWorld()
+        {
+            GameObject worldObject = new GameObject("OpenWorld");
+            worldObject.transform.SetParent(worldRoot.transform, false);
+
+            world = worldObject.AddComponent<WorldGenerator>();
+
+            // ORDRE CRITIQUE :
+            //  1. les tours réservent leur emplacement,
+            //  2. les contrats choisissent leurs points de prise et de livraison,
+            //  3. SEULEMENT ENSUITE on génère le décor.
+            // Sans ça, un pilier peut pousser dans la rampe d'une tour ou dans
+            // une balise de contrat : le joueur se retrouve bloqué.
+            ReserveTowerSpots();
+            PlanContracts();
+
+            world.Generate(worldObject.transform);
+        }
+
+        /// <summary>Emplacements des tours : répartis autour du centre, en triangle.</summary>
+        private void ReserveTowerSpots()
+        {
+            for (int i = 0; i < syncTowerCount; i++)
+            {
+                Vector3 position = GetTowerPosition(i);
+                world.ReserveSpot(position, 26f);
+            }
+        }
+
+        /// <summary>
+        /// Position d'une tour : triangle autour du cœur des ruines.
+        /// L'angle de départ est 45° et non 0°/90°/180°/270° : à ces angles
+        /// passent les quatre grands chemins, et une tour au milieu d'une route
+        /// serait un obstacle absurde.
+        /// </summary>
+        private Vector3 GetTowerPosition(int index)
+        {
+            float angle = 45f + (360f / Mathf.Max(1, syncTowerCount)) * index;
+            float radius = 150f;
+
+            float rad = angle * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Cos(rad) * radius, 0f, Mathf.Sin(rad) * radius);
+        }
+
+        /// <summary>Crée les tours de synchronisation et écoute leur événement.</summary>
+        private void BuildSyncTowers()
+        {
+            GameObject towersRoot = new GameObject("SyncTowers");
+            towersRoot.transform.SetParent(worldRoot.transform, false);
+
+            string[] names = { "Tour de l'Aube", "Tour du Gouffre", "Tour des Cendres" };
+
+            for (int i = 0; i < syncTowerCount; i++)
+            {
+                Vector3 position = GetTowerPosition(i);
+                string towerName = i < names.Length ? names[i] : "Tour " + (i + 1);
+
+                SyncTower tower = SyncTower.Create(
+                    towersRoot.transform,
+                    position,
+                    towerName,
+                    42f + i * 4f,                                   // hauteur croissante
+                    new Color(0.16f, 0.35f, 0.45f),                 // dormante
+                    new Color(1f, 0.72f, 0.25f));                   // synchronisée
+
+                tower.OnSynchronized += HandleTowerSynchronized;
+                tower.OnDescentRequested += HandleDescentRequested;
+                towers.Add(tower);
+            }
+        }
+
+        /// <summary>
+        /// Réaction à la synchronisation d'une tour : révèle boss et contrats.
+        /// L'affichage réel arrive avec la mini-map (Étape 5) ; ici on journalise
+        /// et on confirme visuellement au joueur.
+        /// </summary>
+        private void HandleTowerSynchronized(SyncTower tower)
+        {
+            synchronizedTowerCount++;
+
+            // Le joueur doit comprendre que la carte vient de s'ouvrir : sans
+            // retour immédiat, la synchronisation passe inaperçue.
+            PlayerStats stats = FindPlayerStats();
+            if (stats != null)
+                stats.TriggerInvulnerability(1.5f);
+
+            Debug.Log("[AETHER DRIFT] Progression : " + synchronizedTowerCount + "/" + towers.Count
+                + " tours synchronisées. Les icônes de boss et de contrats sont révélées sur la carte.");
+
+            if (contractManager != null)
+            {
+                Debug.Log("[AETHER DRIFT] Contrats visibles : " + contractManager.Contracts.Count
+                    + " (dont " + CountAvailableContracts() + " disponibles).");
+            }
+        }
+
+        /// <summary>Récupère les jauges du joueur (créées dans BuildPlayer).</summary>
+        private PlayerStats FindPlayerStats()
+        {
+            if (playerTransform == null)
+                return null;
+
+            return playerTransform.GetComponent<PlayerStats>();
+        }
+
+        /// <summary>
+        /// Le joueur demande à redescendre d'une tour : on lui fournit
+        /// l'itinéraire et on lance la descente guidée.
+        /// </summary>
+        private void HandleDescentRequested(SyncTower tower)
+        {
+            if (playerTransform == null || tower == null)
+                return;
+
+            if (descentHelper == null)
+                descentHelper = DescentHelper.Create(playerTransform);
+
+            if (descentHelper == null)
+                return;
+
+            descentHelper.BeginDescent(tower.GetDescentRoute());
+        }
+
+        /// <summary>Nombre de contrats ni pris ni terminés.</summary>
+        private int CountAvailableContracts()
+        {
+            if (contractManager == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < contractManager.Contracts.Count; i++)
+            {
+                ContractManager.Contract contract = contractManager.Contracts[i];
+                if (!contract.IsTaken && !contract.IsCompleted)
+                    count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Choisit les emplacements des contrats AVANT la génération du décor,
+        /// puis réserve ces positions pour qu'aucun pilier n'y apparaisse.
+        /// </summary>
+        private void PlanContracts()
+        {
+            GameObject contractsRoot = new GameObject("ContractManager");
+            contractsRoot.transform.SetParent(worldRoot.transform, false);
+
+            contractManager = contractsRoot.AddComponent<ContractManager>();
+
+            // Graine dérivée : les contrats changent si la taille du monde change.
+            System.Random random = new System.Random((worldHalfSize * 7f).GetHashCode() ^ 0x5EED);
+            contractManager.PlanContracts(random, world, contractCount);
+
+            for (int i = 0; i < contractManager.Contracts.Count; i++)
+            {
+                ContractManager.Contract contract = contractManager.Contracts[i];
+                world.ReserveSpot(contract.PickupPosition, 10f);
+                world.ReserveSpot(contract.DeliveryPosition, 10f);
+            }
+        }
+
+        /// <summary>Construit la géométrie des contrats (balises lumineuses).</summary>
+        private void BuildContracts()
+        {
+            if (contractManager == null || playerTransform == null)
+                return;
+
+            contractManager.Initialize(playerTransform);
         }
 
         // ============================================================
@@ -243,6 +483,16 @@ namespace AetherDrift.Core
             light.shadowStrength = 0.85f;
 
             lightObject.transform.rotation = Quaternion.Euler(sunAngles.x, sunAngles.y, 0f);
+
+            // Monde ouvert : la caméra voit très loin, mais les ombres au-delà
+            // de ~150 m sont invisibles à l'écran et coûtent cher. On garde donc
+            // une zone d'ombre courte et nette autour du joueur.
+            if (openWorldEnabled)
+            {
+                light.shadowStrength = 0.8f;
+                QualitySettings.shadowDistance = 150f;
+                QualitySettings.shadowCascades = 2;
+            }
         }
 
         /// <summary>
@@ -254,7 +504,11 @@ namespace AetherDrift.Core
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = fogColor;
-            RenderSettings.fogDensity = fogDensity;
+
+            // Monde ouvert : brouillard plus léger pour laisser voir les tours
+            // au loin (elles servent de repère de navigation). Sans lui, à
+            // 700 m de distance, tout serait uniformément gris.
+            RenderSettings.fogDensity = openWorldEnabled ? 0.0012f : fogDensity;
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.20f, 0.24f, 0.33f);
@@ -265,6 +519,35 @@ namespace AetherDrift.Core
         // ============================================================
         // DIAGNOSTIC (Éditeur uniquement)
         // ============================================================
+
+        /// <summary>
+        /// Résumé lisible du monde généré, dans la Console Unity.
+        /// Utile quand on ouvre le projet pour la première fois : on voit
+        /// immédiatement ce qui a été créé et où se trouve quoi.
+        /// </summary>
+        private void LogOpenWorldSummary()
+        {
+            if (!openWorldEnabled)
+            {
+                Debug.Log("[AETHER DRIFT] Mode arène (Étape 1) : monde ouvert désactivé.");
+                return;
+            }
+
+            int triangles = 0;
+            MeshFilter[] filters = worldRoot.GetComponentsInChildren<MeshFilter>(true);
+            for (int i = 0; i < filters.Length; i++)
+            {
+                if (filters[i].sharedMesh != null)
+                    triangles += filters[i].sharedMesh.triangles.Length / 3;
+            }
+
+            Debug.Log("[AETHER DRIFT] MONDE OUVERT — " + (worldHalfSize * 2f) + " m de côté.\n"
+                + "  • Zones : ruines (centre), rampes de saut (nord), chemins anciens (anneau).\n"
+                + "  • Tours de synchronisation : " + towers.Count + " — monte la spirale, puis R pour redescendre.\n"
+                + "  • Contrats : " + (contractManager != null ? contractManager.Contracts.Count : 0)
+                + " balises cyan (traverse-les).\n"
+                + "  • " + filters.Length + " objets de décor, " + triangles + " triangles au total.");
+        }
 
         /// <summary>
         /// Affiche version d'Unity, pipeline et shader retenu.

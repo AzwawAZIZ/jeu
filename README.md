@@ -38,10 +38,11 @@ Assets/
     ├── Editor/    → BootSceneCreator.cs (menu de création de scène)
     ├── Scenes/    → Boot.unity (créée via le menu)
     └── Scripts/
-        ├── Core/      → GameBootstrapper.cs (génération procédurale)
-        ├── Player/    → CameraFollow.cs, PlayerVehicle.cs
-        ├── World/     → (Étape 3 : terrain, ruines, props)
-        ├── Enemies/   → (Étape 4 : Seigneurs Mécaniques / boss)
+        ├── Core/      → GameBootstrapper.cs, LowPolyMesh.cs, MeshUtils.cs, ProceduralMaterials.cs
+        ├── Player/    → CameraFollow.cs, PlayerVehicle.cs, CarController.cs, PlayerStats.cs…
+        ├── World/     → WorldGenerator.cs, SyncTower.cs, ContractManager.cs, DescentHelper.cs,
+        │                ArenaEnvironment.cs
+        ├── Enemies/   → ChaserAI.cs (Étape 3) — Seigneurs Mécaniques à l'Étape 4
         └── UI/        → (Étape 5 : HUD, menus, jauge boost/drift)
 ```
 
@@ -49,7 +50,9 @@ Assets/
 
 ## 🛠️ Comment ouvrir le projet (Unity)
 
-> 📖 **Débutant complet ?** Suis le guide illustré pas-à-pas : **[docs/ETAPE1-GUIDE.md](docs/ETAPE1-GUIDE.md)** (installation Unity, création de la scène, lancement, personnalisation).
+> 📖 **Débutant complet ?** Suis le guide illustré pas-à-pas : **[docs/ETAPE1-GUIDE.md](docs/ETAPE1-GUIDE.md)** (installation Unity, création de la scène, lancement).
+>
+> 🌍 **Nouveau : le monde ouvert de l'Étape 3** est expliqué dans **[docs/ETAPE3-GUIDE.md](docs/ETAPE3-GUIDE.md)** — comment monter une tour, remplir un contrat, semer les chasseurs, et régler le monde sans écrire une ligne de code.
 
 1. **Unity version recommandée :** 2022.3 LTS (ou Unity 6). Le code est compatible Built-in et URP (le Bootstrapper choisit automatiquement le shader `Universal Render Pipeline/Lit` si disponible, sinon `Standard`).
 2. **Ouvre le dossier** du dépôt dans Unity Hub → *Add* → sélectionne la racine du repo (celle qui contient `Assets/`, `ProjectSettings/`, `Packages/`).
@@ -62,6 +65,86 @@ Assets/
    - une lumière directionnelle avec ombres.
 > 💡 **Le fichier `Boot.unity` n'est pas dans le dépôt** : c'est volontaire. Le Bootstrapper est la source de vérité — le contenu se régénère à chaque Play, et la scène reste réduite à un seul GameObject (donc sans conflit Git). Les fichiers `.meta` sont générés par Unity à la première ouverture, puis versionnés.
 
+## 🌍 Étape 3 — Le monde ouvert (cette section)
+
+Le monde n'est plus une arène de 220 m : c'est une **carte de 1 200 m × 1 200 m**
+(1,2 km de côté), générée entièrement par code au ▶ Play.
+
+### Les trois zones
+
+| Zone | Où | Contenu | À quoi ça sert |
+|---|---|---|---|
+| **1. Cœur des ruines** | Centre, rayon ≈ 180 m | 260 structures : piliers à tambours (certains brisés), arches franchissables, murets bas, amas de blocs | L'arène de départ, dense mais toujours praticable |
+| **2. Terres de Lancement** | Nord (Z ≈ 450) | 34 rampes de saut (dont 35 % de grandes), buttes de terre | Sauts, vitesse, figures |
+| **3. Chemins anciens** | Anneau + 4 rayons | Routes plates bordées de **bornes lumineuses cyan** | Repères de navigation à 150 km/h |
+
+Tout est **fusionné en un seul maillage par zone** : 4-5 draw calls pour un
+kilomètre de décor, au lieu de plusieurs centaines d'objets séparés.
+
+### Les tours de synchronisation (ADN *Assassin's Creed*)
+
+Trois grandes tours lumineuses (42 à 50 m) sont réparties autour du cœur des
+ruines, à 45°, 165° et 285° — jamais sur un chemin.
+
+1. **Monte** la rampe en spirale (3,5 tours, 12 à 14° de pente — vérifié au
+   calcul : à 2,5 tours la pente montait à 16° et la voiture patinait).
+2. **Atteins le sommet** : la tour passe du bleu dormant à l'**or runique**,
+   trois anneaux lumineux s'élèvent, et la caméra tremble.
+3. **Les icônes de boss et de contrats sont révélées** sur la carte
+   (la mini-map elle-même arrive à l'Étape 5 ; la Console confirme la progression).
+4. **Appuie sur `R`** au sommet pour une **descente guidée** : la voiture glisse
+   jusqu'au pied de la tour, puis le contrôle est rendu. Pas de téléportation :
+   tu vois la descente.
+
+> 🛠️ `R` ne fonctionne **que depuis le sommet** : ailleurs, il ne fait rien.
+
+### Les contrats de livraison (ADN *GTA*)
+
+Trois balises **cyan** sont posées dans le monde. Traverse-en une :
+
+- un **chronomètre** démarre (15 s de marge + trajet à 43 km/h de moyenne :
+  37 s pour 260 m, 55 s pour 480 m — de quoi rater un virage sans perdre),
+- la balise de destination s'allume en **or**,
+- **deux chasseurs** apparaissent derrière toi et tentent de te percuter.
+
+Les chasseurs (coque en coin, œil rouge) poursuivent, chargent quand ils sont
+alignés, puis récupèrent après une charge ratée — cette récupération est ta
+fenêtre pour t'échapper. Une **esquive `Shift` au bon moment annule l'impact**
+grâce aux i-frames de l'Étape 2. Les chasseurs distancés de plus de 400 m se
+retirent d'eux-mêmes.
+
+À l'arrivée : contrat rempli, chasseurs retirés. En cas d'échec : le contrat
+redevient disponible — on ne perd jamais définitivement une mission.
+
+### Repères de conduite (ce qui a été soigné)
+
+Le générateur **n'est pas un semis aléatoire** : il garantit que la carte reste
+roulable, ce qui est la seule chose qui compte en monde ouvert.
+
+| Garde-fou | Effet |
+|---|---|
+| Aucun décor à moins de **13 m d'un chemin** (distance au *segment*, pas au nœud) | On ne percute jamais un pilier en suivant une route |
+| Emplacements des tours et des balises **réservés avant la génération** | Rien ne pousse dans une rampe d'accès ni dans une balise |
+| **Murs invisibles** au bord de la carte | Impossible de tomber dans le vide à 42 m/s |
+| Sol **carré subdivisé** (texture de gravier répétée tous les 40 m) | Pas de trou, pas de scintillement |
+| Ombres limitées à **150 m** autour du joueur | Un kilomètre de décor, sans écrouler le framerate |
+
+### Performance visée
+
+| Élément | Coût approximatif |
+|---|---|
+| Sol (1,2 km, 24×24 quads) | 1 draw call, 1 152 triangles |
+| Zone ruines | 1 draw call, ~20 000 triangles |
+| Zone rampes | 1 draw call, ~5 000 triangles |
+| Chemins + bornes | 2 draw calls |
+| Tours (×3) | ~6 draw calls chacune |
+| Chasseurs (×2 max) | ~4 draw calls chacun |
+
+Environ **40 000 triangles au total**, pour **moins de 30 draw calls** : c'est le
+nombre d'appels de rendu, pas le nombre de triangles, qui fait ramer un jeu.
+D'où la fusion systématique des maillages — et des ombres limitées à 150 m
+autour du joueur, seules réellement visibles.
+
 ### Contrôles (Étape 2 — opérationnels)
 
 | Action | Touche |
@@ -71,8 +154,11 @@ Assets/
 | **Drift** (charge l'Éther) | Maintenir `Espace` |
 | **Boost** (décharge l'Éther) | *Relâcher* `Espace` |
 | **Esquive** (i-frames 0,4 s) | `Shift` ou clic droit |
+| **Descente de tour** (Étape 3) | `R` — uniquement au sommet d'une tour synchronisée |
 | Caméra | suit automatiquement (zoom + secousses) |
 
+> 💡 **Conduite dans le monde ouvert** : les chemins cyan mènent aux tours ; monte la spirale pour révéler la carte. Les balises cyan de contrat démarrent une course contre-la-montre — deux chasseurs se lancent à tes trousses. `Shift` au moment de l'impact les annule.
+>
 > 💡 Les deux dispositions AZERTY et QWERTY sont acceptées : Unity associe `KeyCode` à la position physique de la touche, et le code teste les deux.
 >
 > 🎮 **Boucle de jeu** : drifter pour charger l'Éther → relâcher pour envoyer le boost → esquiver avec `Shift` pour traverser une attaque (0,4 s d'invincibilité, payée en endurance).
@@ -83,7 +169,7 @@ Assets/
 
 - [x] **Étape 1 — Setup + Bootstrapper procédural** : Git, `.gitignore` Unity, arborescence, sol / véhicule / caméra / lumière générés par code, rendu low-poly.
 - [x] **Étape 2 — Conduite arcade + drift + boost** : `CarController` (sphere car), `PlayerStats` (éther + endurance + i-frames), trails procéduraux, caméra à secousses.
-- [ ] **Étape 3 — Monde ouvert** : vallée low-poly, ruines escaladables, props, contrats de livraison (waypoints + timer).
+- [x] **Étape 3 — Monde ouvert** : carte de 1,2 km en 3 zones (`WorldGenerator`), tours de synchronisation escaladables (`SyncTower`), contrats de livraison chronométrés avec chasseurs IA (`ContractManager`, `ChaserAI`), descente guidée (`DescentHelper`).
 - [ ] **Étape 4 — Seigneurs Mécaniques** : IA de boss géant, patterns d'attaque, arène ouverte, dégâts par lames.
 - [ ] **Étape 5 — UI + boucle de jeu** : HUD (vitesse, jauge, contrats), menus, déblocage d'améliorations permanentes (grappin, turbo, lames).
 
@@ -97,6 +183,7 @@ Assets/
 - **Ordre d'exécution :** `GameBootstrapper` a `[DefaultExecutionOrder(-100)]` pour générer le monde avant tout autre script.
 - **Source de vérité unique :** le châssis visuel n'est déplacé que par `CarController.LateUpdate()`. Un seul script écrit un transform donné — deux scripts produiraient un rendu qui tremble.
 - **Responsabilités séparées :** `CarController` lit la physique et applique les forces ; `PlayerStats` possède les ressources et les règles (i-frames, régénération). Le HUD et les boss lisent `PlayerStats` sans toucher au contrôleur.
+- **Pièges C# à connaître :** `const` n'accepte qu'une valeur calculable à la compilation (impossible d'y mettre un champ `[SerializeField]`) ; `0.5` est un `double`, il faut écrire `0.5f` pour un `float` ; un `MeshCollider` non-convexe ne peut pas être un `Rigidbody` dynamique.
 - **Pièges Unity à connaître :** ne jamais déplacer un objet pendant ▶ Play (tout est perdu à la sortie), stocker `GetComponent` dans un champ (`Awake`) plutôt que l'appeler dans `Update`, ne jamais éditer ni supprimer un fichier `.meta` à la main.
 - **Archive de référence (Étape 1) :** branche `arena/04aef5b9-jeu`, commit `0db6aef` — `feat: project setup and procedural bootstrapper`.
 
