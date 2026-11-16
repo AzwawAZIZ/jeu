@@ -277,11 +277,14 @@ namespace AetherDrift.Core
             if (playerTransform != null)
                 follow.SetTarget(playerTransform);
 
-            Vector3 startOffset = new Vector3(0f, 5.5f, -9.5f);
+            // Placement de départ : derrière et au-dessus du véhicule.
+            // CameraFollow recalcule cette position dès sa première image
+            // (orbite à 360°), ceci évite juste un saut visible au lancement.
+            Vector3 startOffset = new Vector3(0f, 4.2f, -10f);
             Vector3 startPosition = (playerTransform != null ? playerTransform.position : Vector3.zero) + startOffset;
             cameraObject.transform.position = startPosition;
             if (playerTransform != null)
-                cameraObject.transform.LookAt(playerTransform.position + new Vector3(0f, 1.2f, 0f));
+                cameraObject.transform.LookAt(playerTransform.position + new Vector3(0f, 1.4f, 0f));
         }
 
         // ============================================================

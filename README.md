@@ -21,7 +21,7 @@ Cette étape initialise le projet et génère **tout le contenu de la scène par
 | Élément | Fichier | Rôle |
 |---|---|---|
 | **Bootstrapper** | `Assets/_Project/Scripts/Core/GameBootstrapper.cs` | Au `Awake()`, génère le sol, le véhicule, la caméra et la lumière via `GameObject.CreatePrimitive`. |
-| **Caméra fluide** | `Assets/_Project/Scripts/Player/CameraFollow.cs` | Suit le véhicule en `LateUpdate()`, zoom arrière + FOV dynamique selon la vitesse. |
+| **Caméra fluide** | `Assets/_Project/Scripts/Player/CameraFollow.cs` | Orbite libre à 360° (souris), recentrage automatique, anti-traversée de décor, zoom et FOV dynamiques. |
 | **Véhicule (base)** | `Assets/_Project/Scripts/Player/PlayerVehicle.cs` | Sphère physique invisible (`Rigidbody` + `SphereCollider`) + châssis low-poly détaché (il suit la sphère et s'oriente vers la trajectoire). |
 | **Modèle 3D** | `Assets/_Project/Resources/Vehicles/` | Bolide low-poly CC0 (Popyca Studio), 4 roues séparées qui tournent et braquent. Repli automatique sur le châssis procédural si absent. |
 | **Conduite** | `Assets/_Project/Scripts/Player/CarController.cs` | Physique *sphere car* (`AddForce`), direction en lacet piloté, adhérence/drift, boost d'éther, dash d'invincibilité, trails procéduraux. |
@@ -155,7 +155,9 @@ autour du joueur, seules réellement visibles.
 | **Boost** (décharge l'Éther) | *Relâcher* `Espace` |
 | **Esquive** (i-frames 0,4 s) | `Shift` ou clic droit |
 | **Descente de tour** (Étape 3) | `R` — uniquement au sommet d'une tour synchronisée |
-| Caméra | suit automatiquement (zoom + secousses) |
+| **Caméra libre 360°** | Souris : regarde à gauche, à droite, au-dessus et derrière |
+| **Recaler la caméra** derrière la voiture | `C` |
+| Zoomer / dézoomer | Molette de la souris |
 
 > 💡 **Conduite dans le monde ouvert** : les chemins cyan mènent aux tours ; monte la spirale pour révéler la carte. Les balises cyan de contrat démarrent une course contre-la-montre — deux chasseurs se lancent à tes trousses. `Shift` au moment de l'impact les annule.
 >

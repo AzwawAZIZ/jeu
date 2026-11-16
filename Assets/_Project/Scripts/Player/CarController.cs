@@ -801,7 +801,10 @@ namespace AetherDrift.Player
                 + "   STEER " + steerInput.ToString("+0;-0;0")
                 + "   DRIFT " + (driftHeld ? "ON" : "off")
                 + "   STATE " + (initialized ? "OK" : "NON INIT")
-                + "   GROUND " + (isGrounded ? "yes" : "no"), inputStyle);
+                + "   GROUND " + (isGrounded ? "yes" : "no")
+                + (cameraFollow != null
+                    ? "   CAM " + cameraFollow.Yaw.ToString("+0;-0;0") + "°"
+                    : "   CAM absente"), inputStyle);
 
             DrawGauge(new Rect(24f, Screen.height - 96f, 260f, 22f),
                 "ÉTHER", stats.EtherRatio, new Color(0.15f, 0.9f, 1f));

@@ -32,6 +32,8 @@ Tu apparais au centre d'une carte de **1 200 m × 1 200 m** (1,2 km de côté).
 | Boost (décharge l'Éther) | *Relâcher* `Espace` |
 | Esquive (0,4 s d'invincibilité) | `Shift` ou clic droit |
 | **Redescendre d'une tour** | `R` (uniquement au sommet) |
+| **Tourner la caméra** (360°) | Souris — `C` pour la remettre derrière la voiture |
+| Zoomer / dézoomer | Molette |
 
 ---
 
@@ -114,6 +116,35 @@ Sélectionne l'objet **Bootstrapper** dans la scène, puis regarde l'Inspector.
 | Rien ne se passe au ▶ | Le Bootstrapper n'est pas dans la scène | Le jeu le crée automatiquement ; sinon, menu **Aether Drift ▸ Créer la scène de boot** |
 
 ---
+
+## 6 bis. La caméra (nouveau)
+
+La caméra tourne librement autour de la voiture :
+
+- **Souris** → tu regardes à gauche, à droite, derrière, et tu lèves ou baisses
+  le point de vue (de la vue rasante à la vue plongeante).
+- **`C`** → la caméra se remet instantanément dans le dos de la voiture.
+- **Molette** → tu rapproches ou éloignes la caméra.
+- Après **1,6 s** sans bouger la souris **et si tu roules**, elle revient
+  d'elle-même derrière la voiture. À l'arrêt, elle reste où tu l'as laissée :
+  c'est pratique pour admirer une tour de synchronisation.
+
+Réglages, dans l'Inspector de l'objet `Main Camera` :
+
+| Champ | Effet |
+|---|---|
+| **Yaw Sensitivity** | Vitesse de rotation horizontale (baisse-la si c'est trop nerveux) |
+| **Pitch Sensitivity** | Vitesse de rotation verticale |
+| **Invert Vertical** | Inverse le haut/bas de la souris |
+| **Min / Max Pitch** | Limites de l'inclinaison (évite de passer sous la voiture) |
+| **Recenter Delay** | Temps avant retour automatique (0 = jamais) |
+| **Recenter Min Speed** | En dessous de cette vitesse, pas de recentrage (5 m/s) |
+| **Avoid Obstacles** | Décoche si la caméra « saute » près des ruines |
+
+> ⚠️ Si la souris ne fait rien : `Edit ▸ Project Settings ▸ Player ▸`
+> **Active Input Handling** doit valoir **Both** (ou *Input Manager (Old)*).
+> En mode *Input System Package (New)* seul, l'ancien `Input` de Unity est
+> désactivé ; la Console affiche alors un avertissement explicite.
 
 ## 7. Ce que tu peux modifier sans risque
 
