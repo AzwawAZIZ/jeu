@@ -16,7 +16,7 @@
 
 ## 🚀 Étape 1 — Ce qui est fait (cette branche)
 
-Cette étape initialise le projet et génère **toute la scène par code**, sans aucune scène `.unity` à créer à la main :
+Cette étape initialise le projet et génère **tout le contenu de la scène par code** : la scène ne contient qu'un GameObject `Bootstrapper` (créé par un menu dédié), et tout le reste apparaît au ▶ Play.
 
 | Élément | Fichier | Rôle |
 |---|---|---|
@@ -57,9 +57,7 @@ Assets/
    - le véhicule runique au centre (sphère invisible + châssis + lames cyan lumineuses),
    - la caméra qui suit le véhicule,
    - une lumière directionnelle avec ombres.
-5. **Sauvegarde la scène** (`Ctrl+S`) sous `Assets/_Project/Scenes/Boot.unity` pour la retrouver au prochain lancement.
-
-> 💡 **Aucune scène n'est fournie dans le repo** : c'est volontaire. Le Bootstrapper est la source de vérité — la scène se régénère à chaque Play. Les fichiers `.meta` seront générés par Unity à la première ouverture (ils sont versionnés ensuite).
+> 💡 **Le fichier `Boot.unity` n'est pas dans le dépôt** : c'est volontaire. Le Bootstrapper est la source de vérité — le contenu se régénère à chaque Play, et la scène reste réduite à un seul GameObject (donc sans conflit Git). Les fichiers `.meta` sont générés par Unity à la première ouverture, puis versionnés.
 
 ### Contrôles (prévus — Étape 2)
 
@@ -89,8 +87,10 @@ Assets/
 
 - **Namespaces :** `AetherDrift.Core`, `AetherDrift.Player`, `AetherDrift.World`, `AetherDrift.Enemies`, `AetherDrift.UI` — un dossier = un namespace.
 - **Commentaires en français** dans le code pour faciliter la lecture ; identifiants en anglais (convention C#).
-- **Aucune dépendance externe** à l'Étape 1 : uniquement `UnityEngine`. Tout est en primitives + matériaux créés par code.
+- **Aucune dépendance externe** à l'Étape 1 : uniquement `UnityEngine` (et `UnityEditor` pour l'outil de menu, exclu du build par `#if UNITY_EDITOR`). Tout est en primitives + matériaux créés par code.
 - **Ordre d'exécution :** `GameBootstrapper` a `[DefaultExecutionOrder(-100)]` pour générer le monde avant tout autre script.
+- **Pièges Unity à connaître :** ne jamais déplacer un objet pendant ▶ Play (tout est perdu à la sortie), stocker `GetComponent` dans un champ (`Awake`) plutôt que l'appeler dans `Update`, ne jamais éditer ni supprimer un fichier `.meta` à la main.
+- **Archive de référence (Étape 1) :** branche `arena/04aef5b9-jeu`, commit `0db6aef` — `feat: project setup and procedural bootstrapper`.
 
 ---
 

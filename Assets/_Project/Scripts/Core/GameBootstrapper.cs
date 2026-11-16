@@ -85,11 +85,16 @@ namespace AetherDrift.Core
         private void RemoveDefaultSceneObjects()
         {
             // Caméras tierces (la nôtre n'existe pas encore à ce stade).
+            // On désactive AVANT de détruire : Destroy n'agit qu'en fin de frame,
+            // et l'ancienne caméra pourrait sinon encore s'afficher / répondre à Camera.main.
             Camera[] cameras = FindObjectsOfType<Camera>();
             foreach (Camera cam in cameras)
             {
                 if (cam != null && cam.gameObject != gameObject)
+                {
+                    cam.gameObject.SetActive(false);
                     Destroy(cam.gameObject);
+                }
             }
 
             // Lumières tierces.
@@ -97,7 +102,10 @@ namespace AetherDrift.Core
             foreach (Light l in lights)
             {
                 if (l != null && l.gameObject != gameObject)
+                {
+                    l.gameObject.SetActive(false);
                     Destroy(l.gameObject);
+                }
             }
 
             // Éventuel AudioListener orphelin (deux listeners = avertissement Unity).
