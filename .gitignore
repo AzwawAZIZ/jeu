@@ -1,0 +1,76 @@
+# ==========================================================
+# AETHER DRIFT — .gitignore Unity
+# Base : github/gitignore Unity.gitignore, adapté projet.
+# Objectif : versionner UNIQUEMENT les sources + réglages,
+# jamais les dossiers générés par Unity.
+# ==========================================================
+
+# --- Dossiers générés par Unity (à NE JAMAIS committer) ---
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/AddressablesData/
+
+# --- Fichiers de cache / crash Unity ---
+sysinfo.txt
+*.stackdump
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.VC.opendb
+
+# --- Projets générés par l'IDE (régénérés par Unity) ---
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.tmp
+ExportedObj/
+.consulo/
+
+# --- Builds / packages ---
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.xcodeproj
+
+# --- Crashlytics ---
+crashlytics-build.properties
+
+# --- OS ---
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Éditeurs / IDE ---
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================================
+# IMPORTANT : les fichiers .meta DOIVENT être versionnés.
+# Unity s'en sert pour les GUID : sans eux, tous les liens
+# entre scripts, scènes et assets sont cassés à l'ouverture.
+# ==========================================================
+!/[Aa]ssets/**/*.meta
+!/[Pp]roject[Ss]ettings/**/*.meta
+!/[Pp]ackages/**/*.meta

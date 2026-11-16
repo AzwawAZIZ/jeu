@@ -1,0 +1,42 @@
+# ==========================================================
+# AETHER DRIFT — .gitattributes (projet Unity)
+# ==========================================================
+
+# Normalisation des fins de ligne.
+* text=auto
+
+# --- Fichiers texte Unity (YAML) : Unity sait les fusionner si on
+#     déclare le driver "unity" (voir UnityYAMLMerge). On évite au
+#     minimum les conflits de fins de ligne. ---
+*.unity      text
+*.prefab     text
+*.asset      text
+*.mat        text
+*.meta       text
+*.controller text
+*.anim       text
+
+# --- Scripts ---
+*.cs         text diff=csharp
+*.shader     text
+*.hlsl       text
+*.cginc      text
+
+# --- Fichiers binaires : ne jamais toucher aux fins de ligne ---
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.tga        binary
+*.psd        binary
+*.fbx        binary
+*.wav        binary
+*.mp3        binary
+*.ogg        binary
+*.dll        binary
+*.so         binary
+*.bundle     binary
+*.unitypackage binary
+
+# --- Modèles 3D : on garde les fichiers lourds hors du diff ---
+*.fbx        -diff
+*.obj        -diff
