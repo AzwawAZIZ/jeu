@@ -94,13 +94,21 @@ namespace AetherDrift.Player
                     continue;
                 }
 
-                // Pivot vide + mesh enfant : la rotation du pivot fait tourner la roue
-                // proprement, sans décaler le mesh (il est déjà centré sur 0).
+                // ATTENTION : les sommets du mesh contiennent DÉJÀ la position de la
+                // roue (ils ont été exportés en coordonnées monde).
+                // Pour que la roue tourne sur son propre axe, il faut :
+                //   1. recentrer la géométrie sur (0,0,0)   -> sommets - centre
+                //   2. placer le PIVOT au centre de la roue -> la roue retrouve sa place
+                //   3. laisser le mesh à l'origine du pivot  -> pas de double offset
+                Vector3 center = wheelPositions[i];
+                Mesh centeredMesh = RecenterMesh(wheelMesh, center);
+
                 GameObject pivot = new GameObject(wheelNames[i] + "_pivot");
                 pivot.transform.SetParent(root.transform, false);
-                pivot.transform.localPosition = wheelPositions[i];
+                pivot.transform.localPosition = center;
 
-                CreateMeshObject(wheelNames[i], pivot.transform, wheelMesh, bodyMaterial);
+                CreateMeshObject(wheelNames[i], pivot.transform, centeredMesh, bodyMaterial)
+                    .transform.localPosition = Vector3.zero;
 
                 WheelSpinner spinner = pivot.AddComponent<WheelSpinner>();
                 // Les deux premières roues sont directrices.
@@ -115,6 +123,21 @@ namespace AetherDrift.Player
             result.SteeringWheels = steering.ToArray();
 
             return result;
+        }
+
+        /// <summary>
+        /// Décale tous les sommets d'un mesh de -offset, pour que son origine
+        /// géométrique coïncide avec le pivot qui le porte.
+        /// </summary>
+        private static Mesh RecenterMesh(Mesh mesh, Vector3 offset)
+        {
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] -= offset;
+
+            mesh.vertices = vertices;
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         /// <summary>
