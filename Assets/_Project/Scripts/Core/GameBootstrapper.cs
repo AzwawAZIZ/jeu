@@ -52,6 +52,29 @@ namespace AetherDrift.Core
 
         private Transform playerTransform;
 
+        /// <summary>
+        /// Filet de sécurité : si la scène ne contient AUCUN GameBootstrapper
+        /// (scène vide, scène "Basic" par défaut, mauvaise scène ouverte…),
+        /// on en crée un automatiquement au lancement du Play.
+        ///
+        /// Résultat : appuyer sur ▶ Play suffit TOUJOURS, quelle que soit la
+        /// scène ouverte. Plus besoin de créer le GameObject à la main.
+        ///
+        /// [RuntimeInitializeOnLoadMethod] s'exécute une seule fois au démarrage
+        /// du jeu, AVANT les Awake() de la scène (AfterSceneLoad).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureBootstrapperExists()
+        {
+            // Un Bootstrapper est déjà dans la scène ? Il fait le travail, on ne touche à rien.
+            if (FindObjectOfType<GameBootstrapper>() != null)
+                return;
+
+            GameObject auto = new GameObject("Bootstrapper (auto)");
+            auto.AddComponent<GameBootstrapper>();
+            Debug.Log("[AETHER DRIFT] Aucun Bootstrapper dans la scène : création automatique.");
+        }
+
         private void Awake()
         {
             // 0. Nettoyage : si l'utilisateur a créé la scène avec "Basic (Built-in)",
