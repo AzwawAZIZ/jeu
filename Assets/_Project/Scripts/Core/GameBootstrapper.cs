@@ -1,72 +1,82 @@
 using UnityEngine;
 using AetherDrift.Player;
+using AetherDrift.World;
 
 namespace AetherDrift.Core
 {
     /// <summary>
     /// Point d'entrée procédural du jeu — ÉTAPE 1.
     ///
-    /// Au lancement de la scène (Awake), ce script génère AUTOMATIQUEMENT
-    /// tout le nécessaire pour voir le jeu tourner, sans aucune scène .unity
-    /// ni aucun asset à placer à la main :
+    /// Au lancement (Awake) ce script assemble TOUTE la scène par code :
+    /// aucun asset, aucune scène préparée à la main.
     ///
-    ///   1. Le SOL de l'arène / monde ouvert (grand plan sombre).
-    ///   2. Le VÉHICULE du joueur (sphère physique invisible + châssis visuel
-    ///      en primitives avec lames latérales lumineuses).
-    ///   3. La CAMÉRA principale avec CameraFollow (zoom selon la vitesse).
-    ///   4. Une LUMIÈRE directionnelle avec ombres.
-    ///   5. (Bonus Étape 1) Quelques ruines décoratives pour donner l'échelle
-    ///      de la vallée — le vrai monde ouvert arrive à l'Étape 3.
+    ///   Sol facetté + anneau d'arène + cercle runique   (World/ArenaEnvironment)
+    ///   Ruines : piliers, tambours, débris              (World/ArenaEnvironment)
+    ///   Montagnes d'horizon + dôme de ciel dégradé      (World/ArenaEnvironment)
+    ///   Véhicule runique low-poly                       (Player/PlayerVehicle)
+    ///   Caméra chase avec zoom dynamique                (Player/CameraFollow)
+    ///   Soleil bas + brouillard + ambiance              (ce fichier)
     ///
-    /// Utilisation dans Unity :
-    ///   - Crée une scène vide, ajoute un GameObject "Bootstrapper",
-    ///   - Glisse ce script dessus, appuie sur Play : tout apparaît.
-    ///
-    /// [DefaultExecutionOrder(-100)] garantit que le Bootstrapper tourne
-    /// AVANT tous les autres scripts (le monde existe avant qu'on le suive).
+    /// UTILISATION : appuie simplement sur ▶ Play. Si la scène ne contient
+    /// aucun Bootstrapper, il s'en crée un automatiquement (voir
+    /// EnsureBootstrapperExists) — le menu Aether Drift reste disponible
+    /// pour créer explicitement la scène Boot.unity.
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public class GameBootstrapper : MonoBehaviour
     {
         [Header("Sol / Arène")]
-        [Tooltip("Taille du sol (en mètres, côté du carré).")]
-        [SerializeField] private float groundSize = 200f;
+        [Tooltip("Diamètre du sol praticable, en mètres.")]
+        [SerializeField] private float groundDiameter = 220f;
 
-        [Tooltip("Couleur sombre du sol.")]
-        [SerializeField] private Color groundColor = new Color(0.10f, 0.11f, 0.13f);
+        [Tooltip("Rayon de l'anneau de pierre et du cercle runique.")]
+        [SerializeField] private float arenaRadius = 26f;
+
+        [Header("Décor")]
+        [Tooltip("Nombre de piliers de ruines autour de l'arène.")]
+        [SerializeField] private int ruinPillarCount = 14;
+
+        [Tooltip("Nombre de montagnes à l'horizon.")]
+        [SerializeField] private int mountainCount = 26;
 
         [Header("Véhicule")]
-        [Tooltip("Position d'apparition du véhicule (y ≈ 0.5 : il se pose sur le sol).")]
+        [Tooltip("Position d'apparition (y ≈ 0.5 : il se pose sur le sol).")]
         [SerializeField] private Vector3 playerSpawnPosition = new Vector3(0f, 0.5f, 0f);
 
         [Header("Caméra")]
-        [Tooltip("Couleur du ciel / fond.")]
+        [Tooltip("Couleur de fond si aucun ciel n'est visible.")]
         [SerializeField] private Color skyColor = new Color(0.08f, 0.10f, 0.16f);
 
-        [Header("Lumière")]
-        [Tooltip("Intensité de la lumière directionnelle.")]
-        [SerializeField] private float lightIntensity = 1.1f;
+        [Header("Lumière / Ambiance")]
+        [Tooltip("Intensité du soleil.")]
+        [SerializeField] private float lightIntensity = 1.25f;
 
-        [Tooltip("Couleur de la lumière (lumière chaude de fin de journée).")]
-        [SerializeField] private Color lightColor = new Color(1f, 0.92f, 0.78f);
+        [Tooltip("Couleur du soleil (aube froide et dorée).")]
+        [SerializeField] private Color lightColor = new Color(1f, 0.94f, 0.86f);
+
+        [Tooltip("Rotation du soleil : x = hauteur, y = azimut.")]
+        [SerializeField] private Vector2 sunAngles = new Vector2(18f, -35f);
+
+        [Tooltip("Couleur du brouillard (doit s'accorder au ciel).")]
+        [SerializeField] private Color fogColor = new Color(0.26f, 0.30f, 0.38f);
+
+        [Tooltip("Densité du brouillard exponentiel.")]
+        [SerializeField] private float fogDensity = 0.008f;
 
         private Transform playerTransform;
+        private GameObject worldRoot;
+
+        // ============================================================
+        // DÉMARRAGE
+        // ============================================================
 
         /// <summary>
-        /// Filet de sécurité : si la scène ne contient AUCUN GameBootstrapper
-        /// (scène vide, scène "Basic" par défaut, mauvaise scène ouverte…),
-        /// on en crée un automatiquement au lancement du Play.
-        ///
-        /// Résultat : appuyer sur ▶ Play suffit TOUJOURS, quelle que soit la
-        /// scène ouverte. Plus besoin de créer le GameObject à la main.
-        ///
-        /// [RuntimeInitializeOnLoadMethod] s'exécute une seule fois au démarrage
-        /// du jeu, AVANT les Awake() de la scène (AfterSceneLoad).
+        /// Filet de sécurité : si la scène ne contient AUCUN GameBootstrapper,
+        /// on en crée un au lancement du Play. Appuyer sur ▶ suffit toujours.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureBootstrapperExists()
         {
-            // Un Bootstrapper est déjà dans la scène ? Il fait le travail, on ne touche à rien.
             if (FindObjectOfType<GameBootstrapper>() != null)
                 return;
 
@@ -77,39 +87,35 @@ namespace AetherDrift.Core
 
         private void Awake()
         {
-            // 0. Nettoyage : si l'utilisateur a créé la scène avec "Basic (Built-in)",
-            //    Unity y a placé une caméra et une lumière par défaut. On les supprime
-            //    pour éviter deux caméras (et deux AudioListener) qui se battent.
             RemoveDefaultSceneObjects();
 
-            // Ordre important : le sol d'abord, puis le véhicule posé dessus,
-            // puis la caméra qui le suit, puis la lumière qui l'éclaire.
-            CreateGround();
-            CreatePlayerVehicle();
-            CreateCamera();
-            CreateDirectionalLight();
-            CreateDecorativeRuins();
+            worldRoot = new GameObject("World (généré)");
 
+            BuildGround();
+            BuildArena();
+            BuildRuins();
+            BuildHorizon();
+            BuildSky();
+            BuildPlayer();
+            BuildCamera();
+            BuildSun();
             ConfigureAmbiance();
 
+            LogDiagnostics();
             Debug.Log("[AETHER DRIFT] Bootstrapper : scène générée procéduralement (Étape 1).");
         }
 
         // ============================================================
-        // 0. NETTOYAGE DE LA SCÈNE
+        // NETTOYAGE
         // ============================================================
 
         /// <summary>
-        /// Supprime les caméras et lumières déjà présentes dans la scène
-        /// (scène "Basic" par défaut d'Unity, scène sauvegardée après un Play,
-        /// ou relance du Bootstrapper). Le Bootstrapper est la seule source
-        /// de vérité : la scène ne doit contenir que lui.
+        /// Supprime caméras, lumières et AudioListener déjà présents
+        /// (scène "Basic" d'Unity, ou ancien Play). Le Bootstrapper est
+        /// la seule source de vérité du contenu de la scène.
         /// </summary>
         private void RemoveDefaultSceneObjects()
         {
-            // Caméras tierces (la nôtre n'existe pas encore à ce stade).
-            // On désactive AVANT de détruire : Destroy n'agit qu'en fin de frame,
-            // et l'ancienne caméra pourrait sinon encore s'afficher / répondre à Camera.main.
             Camera[] cameras = FindObjectsOfType<Camera>();
             foreach (Camera cam in cameras)
             {
@@ -120,7 +126,6 @@ namespace AetherDrift.Core
                 }
             }
 
-            // Lumières tierces.
             Light[] lights = FindObjectsOfType<Light>();
             foreach (Light l in lights)
             {
@@ -131,7 +136,6 @@ namespace AetherDrift.Core
                 }
             }
 
-            // Éventuel AudioListener orphelin (deux listeners = avertissement Unity).
             AudioListener[] listeners = FindObjectsOfType<AudioListener>();
             foreach (AudioListener listener in listeners)
             {
@@ -141,121 +145,55 @@ namespace AetherDrift.Core
         }
 
         // ============================================================
-        // 1. SOL
+        // MONDE
         // ============================================================
 
-        /// <summary>
-        /// Grand plan sombre qui sert de sol à l'arène / vallée.
-        /// Le MeshCollider de la primitive Plane est conservé : le véhicule
-        /// (et plus tard les ennemis) peuvent rouler dessus.
-        /// </summary>
-        private void CreateGround()
+        private void BuildGround()
         {
-            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground (Arène)";
-            ground.tag = "Untagged";
-
-            // Le plan Unity fait 10x10 m : on le met à l'échelle pour couvrir groundSize.
-            float scale = groundSize / 10f;
-            ground.transform.localScale = new Vector3(scale, 1f, scale);
-            ground.transform.position = Vector3.zero;
-
-            MeshRenderer renderer = ground.GetComponent<MeshRenderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = CreateMaterial(groundColor, Color.black, 0f);
-
-            // Lignes de repérage au sol : indispensables pour "sentir" la vitesse.
-            CreateGroundLines();
+            ArenaEnvironment.CreateGround(groundDiameter, worldRoot.transform);
         }
 
-        /// <summary>
-        /// Trace une grille de lignes fines au sol (façon piste / circuit).
-        /// On utilise de vrais cubes plutôt qu'un plan transparent : c'est
-        /// fiable sur Built-in ET URP, sans réglage de blending fragile.
-        /// Purement visuel : aucun collider.
-        /// </summary>
-        private void CreateGroundLines()
+        private void BuildArena()
         {
-            GameObject gridRoot = new GameObject("GroundLines (repères)");
-            gridRoot.transform.SetParent(transform, false);
-
-            Material lineMat = CreateMaterial(new Color(0.20f, 0.55f, 0.70f), new Color(0.2f, 0.7f, 0.9f), 0.35f);
-
-            float half = groundSize * 0.5f;
-            int steps = Mathf.Max(1, Mathf.RoundToInt(groundSize / 20f)); // une ligne tous les 20 m
-            float thickness = 0.12f;
-            float height = 0.02f;
-
-            for (int i = -steps; i <= steps; i++)
-            {
-                float t = (half / steps) * i;
-
-                // Ligne parallèle à Z.
-                CreateLine(gridRoot.transform, "LineZ_" + i, lineMat,
-                    new Vector3(t, height * 0.5f, 0f), new Vector3(thickness, height, groundSize));
-
-                // Ligne parallèle à X.
-                CreateLine(gridRoot.transform, "LineX_" + i, lineMat,
-                    new Vector3(0f, height * 0.5f, t), new Vector3(groundSize, height, thickness));
-            }
+            ArenaEnvironment.CreateArenaRing(arenaRadius, worldRoot.transform);
         }
 
-        private void CreateLine(Transform parent, string name, Material material, Vector3 position, Vector3 scale)
+        private void BuildRuins()
         {
-            GameObject line = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            line.name = name;
-            line.transform.SetParent(parent, false);
-            line.transform.localPosition = position;
-            line.transform.localScale = scale;
+            ArenaEnvironment.CreateRuins(arenaRadius, worldRoot.transform, ruinPillarCount);
+        }
 
-            Collider col = line.GetComponent<Collider>();
-            if (col != null)
-            {
-                col.enabled = false;
-                Destroy(col);
-            }
+        private void BuildHorizon()
+        {
+            ArenaEnvironment.CreateDistantMountains(groundDiameter * 0.45f, worldRoot.transform, mountainCount);
+        }
 
-            MeshRenderer renderer = line.GetComponent<MeshRenderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = material;
+        private void BuildSky()
+        {
+            ArenaEnvironment.CreateSkyDome(groundDiameter * 3.2f, worldRoot.transform);
         }
 
         // ============================================================
-        // 2. VÉHICULE
+        // VÉHICULE + CAMÉRA
         // ============================================================
 
-        /// <summary>
-        /// Crée le véhicule du joueur :
-        /// - Racine "PlayerVehicle" taggée "Player" (la caméra la retrouve).
-        /// - Rigidbody + PlayerVehicle (qui construit la sphère invisible
-        ///   et le châssis visuel dans son Awake).
-        /// </summary>
-        private void CreatePlayerVehicle()
+        private void BuildPlayer()
         {
             GameObject player = new GameObject("PlayerVehicle");
             player.tag = "Player";
             player.transform.position = playerSpawnPosition;
             player.transform.rotation = Quaternion.identity;
 
-            // Rigidbody porté par la racine (la sphère invisible est enfant).
             Rigidbody rb = player.AddComponent<Rigidbody>();
             rb.mass = 1200f;
 
-            // Le script PlayerVehicle configure la physique complète et le visuel.
+            // PlayerVehicle construit la sphère physique et le châssis low-poly.
             player.AddComponent<PlayerVehicle>();
 
             playerTransform = player.transform;
         }
 
-        // ============================================================
-        // 3. CAMÉRA
-        // ============================================================
-
-        /// <summary>
-        /// Caméra principale taggée "MainCamera" avec le script CameraFollow.
-        /// Position initiale derrière le véhicule, regard vers lui.
-        /// </summary>
-        private void CreateCamera()
+        private void BuildCamera()
         {
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
@@ -263,35 +201,28 @@ namespace AetherDrift.Core
             Camera cam = cameraObject.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = skyColor;
-            cam.fieldOfView = 60f;
-            cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 500f;
+            cam.fieldOfView = 62f;
+            cam.nearClipPlane = 0.2f;
+            cam.farClipPlane = 900f;
 
             CameraFollow follow = cameraObject.AddComponent<CameraFollow>();
             if (playerTransform != null)
                 follow.SetTarget(playerTransform);
 
-            // Placement initial : derrière et au-dessus du véhicule.
-            // CameraFollow prend le relais à partir de son Start().
-            Vector3 startOffset = new Vector3(0f, 6f, -10f);
+            Vector3 startOffset = new Vector3(0f, 5.5f, -9.5f);
             Vector3 startPosition = (playerTransform != null ? playerTransform.position : Vector3.zero) + startOffset;
             cameraObject.transform.position = startPosition;
             if (playerTransform != null)
-                cameraObject.transform.LookAt(playerTransform.position + new Vector3(0f, 1.5f, 0f));
+                cameraObject.transform.LookAt(playerTransform.position + new Vector3(0f, 1.2f, 0f));
         }
 
         // ============================================================
-        // 4. LUMIÈRE
+        // LUMIÈRE / AMBIANCE
         // ============================================================
 
-        /// <summary>
-        /// Lumière directionnelle (soleil) avec ombres dynamiques.
-        /// Angle bas pour une ambiance "fin de journée" médiévale-fantastique.
-        /// </summary>
-        private void CreateDirectionalLight()
+        private void BuildSun()
         {
             GameObject lightObject = new GameObject("Directional Light (Soleil)");
-            lightObject.tag = "Untagged";
 
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
@@ -299,114 +230,47 @@ namespace AetherDrift.Core
             light.intensity = lightIntensity;
             light.shadows = LightShadows.Soft;
             light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
+            light.shadowStrength = 0.85f;
 
-            // Soleil bas sur l'horizon, en biais pour des ombres longues.
-            lightObject.transform.rotation = Quaternion.Euler(42f, -35f, 0f);
+            lightObject.transform.rotation = Quaternion.Euler(sunAngles.x, sunAngles.y, 0f);
         }
 
-        // ============================================================
-        // 5. RUINES DÉCORATIVES (aperçu du monde ouvert — Étape 3)
-        // ============================================================
-
         /// <summary>
-        /// Quelques piliers de ruines en cercle autour de l'arène.
-        /// Purement décoratif à l'Étape 1 : donne l'échelle de la vallée
-        /// et annonce le thème "ruines escaladables" (grappin = Étape 5).
-        /// Le vrai terrain procédural arrive à l'Étape 3 (dossier World/).
-        /// </summary>
-        private void CreateDecorativeRuins()
-        {
-            GameObject ruinsRoot = new GameObject("Ruins (décor Étape 1)");
-            ruinsRoot.tag = "Untagged";
-
-            Material stoneMat = CreateMaterial(new Color(0.32f, 0.33f, 0.36f), Color.black, 0f);
-            Material mossMat = CreateMaterial(new Color(0.22f, 0.38f, 0.24f), Color.black, 0f);
-
-            int pillarCount = 10;
-            float radius = groundSize * 0.32f;
-
-            for (int i = 0; i < pillarCount; i++)
-            {
-                float angle = (360f / pillarCount) * i;
-                float rad = angle * Mathf.Deg2Rad;
-                Vector3 pos = new Vector3(Mathf.Cos(rad) * radius, 0f, Mathf.Sin(rad) * radius);
-
-                // Hauteur variable : certaines colonnes sont brisées (thème ruines).
-                float height = 6f + ((i * 37) % 10); // pseudo-aléatoire déterministe
-                float width = 2.2f;
-
-                GameObject pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                pillar.name = "RuinPillar_" + i;
-                pillar.transform.SetParent(ruinsRoot.transform, false);
-                pillar.transform.position = new Vector3(pos.x, height * 0.5f, pos.z);
-                pillar.transform.localScale = new Vector3(width, height, width);
-                pillar.transform.rotation = Quaternion.Euler(0f, angle, 0f);
-
-                MeshRenderer renderer = pillar.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                    renderer.sharedMaterial = (i % 3 == 0) ? mossMat : stoneMat;
-
-                // Chapiteau : petit cube au sommet des piliers entiers.
-                if (height > 10f)
-                {
-                    GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    cap.name = "RuinCap_" + i;
-                    cap.transform.SetParent(ruinsRoot.transform, false);
-                    cap.transform.position = new Vector3(pos.x, height + 0.6f, pos.z);
-                    cap.transform.localScale = new Vector3(width * 1.4f, 1.2f, width * 1.4f);
-                    cap.transform.rotation = Quaternion.Euler(0f, angle, 0f);
-
-                    MeshRenderer capRenderer = cap.GetComponent<MeshRenderer>();
-                    if (capRenderer != null)
-                        capRenderer.sharedMaterial = stoneMat;
-                }
-            }
-        }
-
-        // ============================================================
-        // AMBIANCE
-        // ============================================================
-
-        /// <summary>
-        /// Brouillard + lumière ambiante pour l'atmosphère de vallée brumeuse.
+        /// Brouillard + ambiance froide : donne de la profondeur à la vallée
+        /// et fait ressortir les néons cyan du véhicule.
         /// </summary>
         private void ConfigureAmbiance()
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.55f, 0.58f, 0.62f);
-            RenderSettings.fogDensity = 0.012f;
+            RenderSettings.fogColor = fogColor;
+            RenderSettings.fogDensity = fogDensity;
 
-            RenderSettings.ambientLight = new Color(0.35f, 0.38f, 0.45f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.20f, 0.24f, 0.33f);
+            RenderSettings.ambientEquatorColor = new Color(0.14f, 0.16f, 0.21f);
+            RenderSettings.ambientGroundColor = new Color(0.05f, 0.06f, 0.08f);
         }
 
         // ============================================================
-        // OUTILS
+        // DIAGNOSTIC (Éditeur uniquement)
         // ============================================================
 
         /// <summary>
-        /// Matériau compatible Built-in, URP et HDRP (voir PlayerVehicle).
+        /// Affiche version d'Unity, pipeline et shader retenu.
+        /// Utile si le rendu apparaît rose (shader manquant) ou noir.
         /// </summary>
-        private Material CreateMaterial(Color color, Color emissionColor, float emissionIntensity)
+        private void LogDiagnostics()
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null)
-                shader = Shader.Find("Standard");
-            if (shader == null)
-                shader = Shader.Find("Unlit/Color");
-
-            Material mat = new Material(shader);
-            mat.color = color;
-
-            if (emissionIntensity > 0f)
-            {
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", emissionColor * emissionIntensity);
-                mat.SetColor("_Emission", emissionColor * emissionIntensity);
-            }
-
-            return mat;
+#if UNITY_EDITOR
+            Debug.Log("[AETHER DRIFT] Unity " + Application.unityVersion
+                + " | pipeline : " + (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline == null
+                    ? "Built-in"
+                    : UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline.GetType().Name)
+                + " | shader lit : " + (ProceduralMaterials.LitShader != null
+                    ? ProceduralMaterials.LitShader.name
+                    : "AUCUN"));
+#endif
         }
     }
 }
