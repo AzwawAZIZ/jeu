@@ -105,28 +105,28 @@ namespace AetherDrift.Player
             Material glowMat = CreateMaterial(new Color(1f, 0.55f, 0.15f), new Color(1f, 0.45f, 0.1f), 1.6f);
 
             // --- Corps principal : boîte aplatie et allongée ---
-            CreatePart(PrimitiveType.Cube, "Body", visualRoot,
+            CreatePart(PrimitiveType.Cube, "Body", visualRoot.transform,
                 new Vector3(0f, 0.25f, 0f), new Vector3(2.2f, 0.5f, 3.6f), bodyMat);
 
             // --- Nez avant : boîte plus étroite, légèrement inclinée ---
-            GameObject nose = CreatePart(PrimitiveType.Cube, "Nose", visualRoot,
+            GameObject nose = CreatePart(PrimitiveType.Cube, "Nose", visualRoot.transform,
                 new Vector3(0f, 0.18f, 2.1f), new Vector3(1.5f, 0.35f, 1.2f), bodyMat);
             nose.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
 
             // --- Cockpit : sphère écrasée sur le dessus ---
-            CreatePart(PrimitiveType.Sphere, "Cockpit", visualRoot,
+            CreatePart(PrimitiveType.Sphere, "Cockpit", visualRoot.transform,
                 new Vector3(0f, 0.55f, -0.3f), new Vector3(1.1f, 0.6f, 1.4f), darkMat);
 
             // --- Lames latérales lumineuses (signature du bolide runique) ---
-            CreatePart(PrimitiveType.Cube, "LeftBlade", visualRoot,
+            CreatePart(PrimitiveType.Cube, "LeftBlade", visualRoot.transform,
                 new Vector3(-1.35f, 0.25f, 0.2f), new Vector3(0.18f, 0.28f, 3.2f), bladeMat);
-            CreatePart(PrimitiveType.Cube, "RightBlade", visualRoot,
+            CreatePart(PrimitiveType.Cube, "RightBlade", visualRoot.transform,
                 new Vector3(1.35f, 0.25f, 0.2f), new Vector3(0.18f, 0.28f, 3.2f), bladeMat);
 
             // Pointes de lames (petits prismes visuels à l'avant)
-            CreatePart(PrimitiveType.Cube, "LeftBladeTip", visualRoot,
+            CreatePart(PrimitiveType.Cube, "LeftBladeTip", visualRoot.transform,
                 new Vector3(-1.35f, 0.25f, 2.0f), new Vector3(0.18f, 0.28f, 0.5f), bladeMat);
-            CreatePart(PrimitiveType.Cube, "RightBladeTip", visualRoot,
+            CreatePart(PrimitiveType.Cube, "RightBladeTip", visualRoot.transform,
                 new Vector3(1.35f, 0.25f, 2.0f), new Vector3(0.18f, 0.28f, 0.5f), bladeMat);
 
             // --- Patins anti-gravité : 4 cylindres sous le châssis ---
@@ -139,17 +139,17 @@ namespace AetherDrift.Player
             };
             for (int i = 0; i < padPositions.Length; i++)
             {
-                CreatePart(PrimitiveType.Cylinder, "HoverPad_" + i, visualRoot,
+                CreatePart(PrimitiveType.Cylinder, "HoverPad_" + i, visualRoot.transform,
                     padPositions[i], new Vector3(0.35f, 0.25f, 0.35f), bladeMat);
             }
 
             // --- Propulseur arrière : cylindre horizontal lumineux orange ---
-            GameObject thruster = CreatePart(PrimitiveType.Cylinder, "Thruster", visualRoot,
+            GameObject thruster = CreatePart(PrimitiveType.Cylinder, "Thruster", visualRoot.transform,
                 new Vector3(0f, 0.25f, -1.95f), new Vector3(0.6f, 0.5f, 0.6f), glowMat);
             thruster.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
             // --- Aileron arrière ---
-            GameObject spoiler = CreatePart(PrimitiveType.Cube, "Spoiler", visualRoot,
+            GameObject spoiler = CreatePart(PrimitiveType.Cube, "Spoiler", visualRoot.transform,
                 new Vector3(0f, 0.65f, -1.7f), new Vector3(2.0f, 0.12f, 0.5f), darkMat);
             spoiler.transform.localRotation = Quaternion.Euler(12f, 0f, 0f);
         }
