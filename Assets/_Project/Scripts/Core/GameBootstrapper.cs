@@ -184,11 +184,21 @@ namespace AetherDrift.Core
             player.transform.position = playerSpawnPosition;
             player.transform.rotation = Quaternion.identity;
 
+            // --- Ordre d'ajout IMPORTANT ---
+            // 1. Rigidbody : requis par PlayerVehicle et CarController.
             Rigidbody rb = player.AddComponent<Rigidbody>();
             rb.mass = 1200f;
 
-            // PlayerVehicle construit la sphère physique et le châssis low-poly.
+            // 2. PlayerStats : ressources (éther, endurance, i-frames).
+            //    Ajouté avant CarController, qui en dépend ([RequireComponent]).
+            player.AddComponent<PlayerStats>();
+
+            // 3. PlayerVehicle : construit la sphère physique et le châssis low-poly.
             player.AddComponent<PlayerVehicle>();
+
+            // 4. CarController : la conduite. Son Start() récupère le châssis
+            //    construit par PlayerVehicle.Awake().
+            player.AddComponent<CarController>();
 
             playerTransform = player.transform;
         }

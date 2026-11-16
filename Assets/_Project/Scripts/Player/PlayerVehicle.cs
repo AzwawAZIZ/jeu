@@ -4,7 +4,12 @@ using AetherDrift.Core;
 namespace AetherDrift.Player
 {
     /// <summary>
-    /// Véhicule runique du joueur — ÉTAPE 1 (physique + rendu procédural).
+    /// Véhicule runique du joueur — rendu procédural + raccordement physique.
+    ///
+    /// ÉTAPE 2 : ce script ne conduit PAS le véhicule. La conduite est dans
+    /// CarController.cs ; les ressources et l'invulnérabilité dans PlayerStats.cs.
+    /// Ici, on fabrique la machine et on expose les points d'ancrage visuels
+    /// (châssis détaché, lames, réacteurs) que les autres scripts animent.
     ///
     /// ARCHITECTURE (demandée au cahier des charges)
     /// - La racine porte le Rigidbody ; une SPHÈRE invisible (SphereCollider,
@@ -16,8 +21,9 @@ namespace AetherDrift.Player
     /// GÉOMÉTRIE : repère local du véhicule
     ///   +Z = avant, -Z = arrière, +Y = haut, +X = droite.
     ///
-    /// ⚠️ ÉTAPE 1 : véhicule statique (pas de conduite). Le drift, la jauge
-    /// d'endurance et le dash arrivent à l'Étape 2, dans ce même script.
+    /// ⚠️ Le châssis visuel (VisualChassis) est VOLONTAIREMENT détaché de la
+    /// racine : il est suivi en LateUpdate sur la position de la sphère
+    /// physique et s'oriente vers la direction du mouvement (voir CarController).
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class PlayerVehicle : MonoBehaviour
@@ -50,6 +56,21 @@ namespace AetherDrift.Player
 
         private Rigidbody rb;
 
+        /// <summary>Transform du châssis visuel (détaché de la racine).</summary>
+        public Transform VisualChassis { get; private set; }
+
+        /// <summary>Matériau des lames latérales (intensité pilotée par le drift).</summary>
+        public Material BladeMaterial { get; private set; }
+
+        /// <summary>Matériau des cônes de poussée (intensité pilotée par l'accélération).</summary>
+        public Material ThrusterMaterial { get; private set; }
+
+        /// <summary>Matériau de la canopée (teinte pilotée par l'état de dash).</summary>
+        public Material CanopyMaterial { get; private set; }
+
+        /// <summary>Rayon de la sphère physique, en unités monde.</summary>
+        public float PhysicsRadius => physicsRadius;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
@@ -62,8 +83,9 @@ namespace AetherDrift.Player
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
-            // Étape 1 : la rotation est figée, la position reste libre (le véhicule se pose).
-            // L'Étape 2 remplacera ce verrouillage par la conduite.
+            // Le Rigidbody ne tourne pas : c'est le châssis VISUEL qui s'oriente
+            // vers la trajectoire. La physique reste donc parfaitement stable
+            // (aucun renversement possible) tout en gardant un rendu dynamique.
             rb.constraints = RigidbodyConstraints.FreezeRotation;
             rb.isKinematic = false;
 
@@ -110,8 +132,10 @@ namespace AetherDrift.Player
         private void BuildVisualChassis()
         {
             GameObject visualRoot = new GameObject("VisualChassis");
-            visualRoot.transform.SetParent(transform, false);
-            visualRoot.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+            // PAS de SetParent : le châssis est autonome (voir résumé de la classe).
+            visualRoot.transform.position = transform.position + Vector3.up * 0.15f;
+            visualRoot.transform.rotation = Quaternion.identity;
+            VisualChassis = visualRoot.transform;
 
             // --- Matériaux ---
             Material bodyMat = ProceduralMaterials.Create("Body", bodyColor, Color.black, 0f, 0.55f, 0.35f);
@@ -120,6 +144,11 @@ namespace AetherDrift.Player
             Material bladeMat = ProceduralMaterials.Create("Blade", bladeColor, bladeColor, emissionIntensity, 0.8f, 0f);
             Material thrusterMat = ProceduralMaterials.Create("Thruster", thrusterColor, thrusterColor, emissionIntensity, 0.6f, 0f);
             Material canopyMat = ProceduralMaterials.Create("Canopy", new Color(0.05f, 0.08f, 0.11f), new Color(0.1f, 0.5f, 0.7f), 0.6f, 0.95f, 0.2f);
+
+            // Exposés pour que CarController pilote leur intensité en temps réel.
+            BladeMaterial = bladeMat;
+            ThrusterMaterial = thrusterMat;
+            CanopyMaterial = canopyMat;
 
             // --- 1. Coque principale (un seul maillage, facettes assumées) ---
             BuildHull(visualRoot.transform, bodyMat);
@@ -370,6 +399,15 @@ namespace AetherDrift.Player
         }
 
         // ============================================================
+        // NOTE D'ARCHITECTURE
+        // ============================================================
+
+        // Le châssis visuel n'est PAS animé ici : CarController en est le seul
+        // propriétaire (position + orientation + inclinaisons) dans son
+        // LateUpdate. Deux scripts écrivant le même transform produiraient un
+        // rendu qui tremble — on garde donc une source de vérité unique.
+
+        // ============================================================
         // OUTILS
         // ============================================================
 
@@ -404,6 +442,26 @@ namespace AetherDrift.Player
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
 
             return part;
+        }
+
+        /// <summary>
+        /// Point d'ancrage local (repère châssis) de l'arrière d'une lame.
+        /// Source de vérité unique pour les trails : si la géométrie des lames
+        /// bouge, le trail suit automatiquement.
+        /// </summary>
+        /// <param name="side">-1 = gauche, +1 = droite.</param>
+        public Vector3 GetBladeAnchor(int side)
+        {
+            int s = side < 0 ? -1 : 1;
+            return new Vector3(1.30f * s, 0.30f, -1.30f);
+        }
+
+        /// <summary>Point d'ancrage local de l'arrière d'un patin anti-gravité.</summary>
+        /// <param name="side">-1 = gauche, +1 = droite.</param>
+        public Vector3 GetHoverPadAnchor(int side)
+        {
+            int s = side < 0 ? -1 : 1;
+            return new Vector3(0.80f * s, -0.22f, -1.55f);
         }
 
         /// <summary>Section transversale de la coque.</summary>

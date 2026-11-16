@@ -22,7 +22,9 @@ Cette étape initialise le projet et génère **tout le contenu de la scène par
 |---|---|---|
 | **Bootstrapper** | `Assets/_Project/Scripts/Core/GameBootstrapper.cs` | Au `Awake()`, génère le sol, le véhicule, la caméra et la lumière via `GameObject.CreatePrimitive`. |
 | **Caméra fluide** | `Assets/_Project/Scripts/Player/CameraFollow.cs` | Suit le véhicule en `LateUpdate()`, zoom arrière + FOV dynamique selon la vitesse. |
-| **Véhicule (base)** | `Assets/_Project/Scripts/Player/PlayerVehicle.cs` | Sphère physique invisible (`Rigidbody` + `SphereCollider`) + châssis visuel en primitives avec lames latérales lumineuses. Conduite complète = **Étape 2**. |
+| **Véhicule (base)** | `Assets/_Project/Scripts/Player/PlayerVehicle.cs` | Sphère physique invisible (`Rigidbody` + `SphereCollider`) + châssis low-poly détaché (il suit la sphère et s'oriente vers la trajectoire). |
+| **Conduite** | `Assets/_Project/Scripts/Player/CarController.cs` | Physique *sphere car* (`AddForce`), direction en lacet piloté, adhérence/drift, boost d'éther, dash d'invincibilité, trails procéduraux. |
+| **Ressources** | `Assets/_Project/Scripts/Player/PlayerStats.cs` | Jauges d'éther et d'endurance, régénération, i-frames, événements pour le HUD. |
 | **Sol / arène** | généré par le Bootstrapper | Grand plan sombre + ruines décoratives (piliers) pour donner l'échelle de la vallée. |
 | **Lumière** | générée par le Bootstrapper | Lumière directionnelle avec ombres douces + brouillard d'ambiance. |
 | **Outil éditeur** | `Assets/_Project/Editor/BootSceneCreator.cs` | Menu `Aether Drift ▸ Créer la scène de boot` : crée et sauvegarde la scène en un clic. |
@@ -59,24 +61,27 @@ Assets/
    - une lumière directionnelle avec ombres.
 > 💡 **Le fichier `Boot.unity` n'est pas dans le dépôt** : c'est volontaire. Le Bootstrapper est la source de vérité — le contenu se régénère à chaque Play, et la scène reste réduite à un seul GameObject (donc sans conflit Git). Les fichiers `.meta` sont générés par Unity à la première ouverture, puis versionnés.
 
-### Contrôles (prévus — Étape 2)
+### Contrôles (Étape 2 — opérationnels)
 
-| Action | Touche (prévue) |
+| Action | Touche |
 |---|---|
-| Accélérer / Freiner | `Z / S` ou `W / S` (AZERTY) — `↑ / ↓` |
-| Tourner | `Q / D` ou `A / D` — `← / →` |
-| Drift + Boost (jauge) | `Espace` (maintenir) |
-| Dash d'invulnérabilité | `Shift` |
-| Caméra | suit automatiquement le véhicule |
+| Accélérer / Reculer | `Z`/`W` ou `↑` — `S` ou `↓` |
+| Tourner | `Q`/`A` ou `←` — `D` ou `→` |
+| **Drift** (charge l'Éther) | Maintenir `Espace` |
+| **Boost** (décharge l'Éther) | *Relâcher* `Espace` |
+| **Esquive** (i-frames 0,4 s) | `Shift` ou clic droit |
+| Caméra | suit automatiquement (zoom + secousses) |
 
-> ⚠️ À l'Étape 1, le véhicule ne conduit pas encore : il est **statique** (Rigidbody en place, caméra qui le suit). La conduite arcade, le drift et la jauge d'endurance arrivent à l'Étape 2.
+> 💡 Les deux dispositions AZERTY et QWERTY sont acceptées : Unity associe `KeyCode` à la position physique de la touche, et le code teste les deux.
+>
+> 🎮 **Boucle de jeu** : drifter pour charger l'Éther → relâcher pour envoyer le boost → esquiver avec `Shift` pour traverser une attaque (0,4 s d'invincibilité, payée en endurance).
 
 ---
 
 ## 🗺️ Feuille de route (5 étapes)
 
-- [x] **Étape 1 — Setup + Bootstrapper procédural** *(cette branche)* : Git, `.gitignore` Unity, arborescence, sol / véhicule / caméra / lumière générés par code.
-- [ ] **Étape 2 — Conduite arcade + drift + boost** : `PlayerVehicle` complet (accélération, frein, direction, drift, jauge endurance, dash d'invulnérabilité, lames de drift).
+- [x] **Étape 1 — Setup + Bootstrapper procédural** : Git, `.gitignore` Unity, arborescence, sol / véhicule / caméra / lumière générés par code, rendu low-poly.
+- [x] **Étape 2 — Conduite arcade + drift + boost** : `CarController` (sphere car), `PlayerStats` (éther + endurance + i-frames), trails procéduraux, caméra à secousses.
 - [ ] **Étape 3 — Monde ouvert** : vallée low-poly, ruines escaladables, props, contrats de livraison (waypoints + timer).
 - [ ] **Étape 4 — Seigneurs Mécaniques** : IA de boss géant, patterns d'attaque, arène ouverte, dégâts par lames.
 - [ ] **Étape 5 — UI + boucle de jeu** : HUD (vitesse, jauge, contrats), menus, déblocage d'améliorations permanentes (grappin, turbo, lames).
@@ -89,6 +94,8 @@ Assets/
 - **Commentaires en français** dans le code pour faciliter la lecture ; identifiants en anglais (convention C#).
 - **Aucune dépendance externe** à l'Étape 1 : uniquement `UnityEngine` (et `UnityEditor` pour l'outil de menu, exclu du build par `#if UNITY_EDITOR`). Tout est en primitives + matériaux créés par code.
 - **Ordre d'exécution :** `GameBootstrapper` a `[DefaultExecutionOrder(-100)]` pour générer le monde avant tout autre script.
+- **Source de vérité unique :** le châssis visuel n'est déplacé que par `CarController.LateUpdate()`. Un seul script écrit un transform donné — deux scripts produiraient un rendu qui tremble.
+- **Responsabilités séparées :** `CarController` lit la physique et applique les forces ; `PlayerStats` possède les ressources et les règles (i-frames, régénération). Le HUD et les boss lisent `PlayerStats` sans toucher au contrôleur.
 - **Pièges Unity à connaître :** ne jamais déplacer un objet pendant ▶ Play (tout est perdu à la sortie), stocker `GetComponent` dans un champ (`Awake`) plutôt que l'appeler dans `Update`, ne jamais éditer ni supprimer un fichier `.meta` à la main.
 - **Archive de référence (Étape 1) :** branche `arena/04aef5b9-jeu`, commit `0db6aef` — `feat: project setup and procedural bootstrapper`.
 

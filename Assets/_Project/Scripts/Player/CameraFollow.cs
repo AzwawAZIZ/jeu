@@ -52,8 +52,18 @@ namespace AetherDrift.Player
         [Tooltip("Temps de lissage du FOV.")]
         [SerializeField] private float fovSmoothTime = 0.25f;
 
+        [Header("Retours d'impact (boost / esquive)")]
+        [Tooltip("Amplitude maximale de la secousse, en degrés.")]
+        [SerializeField] private float maxShakeAngle = 3.5f;
+
+        [Tooltip("Vitesse d'amortissement de la secousse.")]
+        [SerializeField] private float shakeDamping = 6.5f;
+
         private Camera cam;
         private Rigidbody targetRigidbody;
+        private float shakeAmount;
+        private float fovKick;
+        private float fovKickVelocity;
         private Vector3 positionVelocity; // état interne de SmoothDamp
         private float currentFov;
         private float fovVelocity;
@@ -74,6 +84,24 @@ namespace AetherDrift.Player
                 transform.position = target.position + offset.normalized * minDistance;
                 transform.LookAt(target.position + lookAtOffset);
             }
+        }
+
+        /// <summary>
+        /// Ajoute une secousse (boost, esquive, impact de boss).
+        /// </summary>
+        /// <param name="amount">0 = rien, 1 = secousse maximale.</param>
+        public void AddShake(float amount)
+        {
+            shakeAmount = Mathf.Clamp(shakeAmount + Mathf.Clamp01(amount), 0f, 1.5f);
+        }
+
+        /// <summary>
+        /// Ajoute un coup de FOV : positif = accélération (ouverture),
+        /// négatif = resserrement (esquive).
+        /// </summary>
+        public void AddFovKick(float degrees)
+        {
+            fovKick = Mathf.Clamp(fovKick + degrees, -14f, 22f);
         }
 
         /// <summary>
@@ -139,12 +167,27 @@ namespace AetherDrift.Player
                 transform.rotation = Quaternion.Slerp(transform.rotation, desiredRotation, t);
             }
 
-            // --- FOV dynamique : sensation de vitesse ---
+            // --- FOV dynamique : sensation de vitesse + coups de FOV ponctuels ---
             if (cam != null)
             {
-                float desiredFov = Mathf.Lerp(minFov, maxFov, speedRatio);
+                float desiredFov = Mathf.Lerp(minFov, maxFov, speedRatio) + fovKick;
                 currentFov = Mathf.SmoothDamp(currentFov, desiredFov, ref fovVelocity, fovSmoothTime);
                 cam.fieldOfView = currentFov;
+
+                // Le coup de FOV se résorbe tout seul.
+                fovKick = Mathf.SmoothDamp(fovKick, 0f, ref fovKickVelocity, 0.35f);
+            }
+
+            // --- Secousse : bruit appliqué en rotation, jamais en position ---
+            // (une secousse de position casse le lissage et donne mal au cœur)
+            if (shakeAmount > 0.001f)
+            {
+                float shake = shakeAmount * maxShakeAngle;
+                float noiseX = (Mathf.PerlinNoise(Time.time * 22f, 0f) - 0.5f) * 2f;
+                float noiseY = (Mathf.PerlinNoise(0f, Time.time * 19f) - 0.5f) * 2f;
+
+                transform.rotation *= Quaternion.Euler(noiseX * shake, noiseY * shake, 0f);
+                shakeAmount = Mathf.MoveTowards(shakeAmount, 0f, shakeDamping * Time.deltaTime);
             }
         }
 
