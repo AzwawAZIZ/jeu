@@ -35,7 +35,7 @@ namespace AetherDrift.Player
         /// <summary>Résultat du chargement : racine visuelle + roues.</summary>
         public class LoadedModel
         {
-            public GameObject Root;
+            public Transform Root;
             public Transform[] Wheels = new Transform[0];
             public Transform[] SteeringWheels = new Transform[0];
             public Material BodyMaterial;
